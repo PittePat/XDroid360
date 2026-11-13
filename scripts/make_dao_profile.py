@@ -39,7 +39,7 @@ RECOMP = ROOT / "recomp"
 LLVM = RECOMP / "tools" / "llvm" / "bin"
 NINJA = RECOMP / "tools" / "ninja" / ("ninja.exe" if os.name == "nt" else "ninja")
 DEFAULT_KIT = ROOT.parent / "SD1" / "toolchain" / "out" / "kit"
-VERSION = "dao-2"
+VERSION = "dao-3"
 TITLE_ID = "454108C0"
 # Linked whole into dao-game, or compiled on the phone: not in dao-deps.
 # libdxbc.a: Xenia's DXBC checksum (AMD, no licence grant) is D3D12-only: the Vulkan build never
@@ -160,10 +160,12 @@ def link_libraries(build):
 
 
 def read_inputs():
-    """profiles/dao: the supported default.xex's hash and the generated headers' (none of it game code)."""
-    xex = (INPUTS / "default.xex.sha256").read_text(encoding="utf-8").strip()
-    if not re.fullmatch(r"[0-9a-f]{64}", xex):
-        sys.exit(f"{INPUTS / 'default.xex.sha256'} holds no SHA-256")
+    """profiles/dao: the supported default.xex files' hashes and the generated headers' (none of it
+    game code). The first hash is the disc the translation is made from; the others are discs whose
+    default.xex was checked to translate to the very same code."""
+    xex = (INPUTS / "default.xex.sha256").read_text(encoding="utf-8").split()
+    if not xex or not all(re.fullmatch(r"[0-9a-f]{64}", h) for h in xex):
+        sys.exit(f"{INPUTS / 'default.xex.sha256'} holds no SHA-256, or something else")
     return xex, {h: sha256(INPUTS / "ppc" / h) for h in ("ppc_config.h", "ppc_context.h")}
 
 
@@ -173,7 +175,10 @@ def refresh_inputs():
     if not xex.is_file():
         sys.exit(f"No {xex}")
     (INPUTS / "ppc").mkdir(parents=True, exist_ok=True)
-    (INPUTS / "default.xex.sha256").write_text(sha256(xex) + "\n", encoding="utf-8", newline="\n")
+    # The other discs' hashes stay: they were checked to translate to the same code.
+    listed = INPUTS / "default.xex.sha256"
+    others = listed.read_text(encoding="utf-8").split()[1:] if listed.is_file() else []
+    listed.write_text("".join(h + "\n" for h in [sha256(xex)] + others), encoding="utf-8", newline="\n")
     for h in ("ppc_config.h", "ppc_context.h"):
         shutil.copy2(RECOMP / "ppc" / h, INPUTS / "ppc" / h)
     print(f"{INPUTS}: written from {xex} and recomp/ppc")
@@ -198,7 +203,7 @@ def toml_template():
     return text
 
 
-def recipe(kit, xex_sha256, headers):
+def recipe(kit, xex_sha256s, headers):
     cxx = ["--target=aarch64-none-linux-android29", "--sysroot=${KIT}/sysroot",
            "-resource-dir", "${KIT}/clang/22",
            "-DANDROID", "-fdata-sections", "-ffunction-sections", "-funwind-tables",
@@ -222,14 +227,14 @@ def recipe(kit, xex_sha256, headers):
         # Game files: 6.4 GB on the PC, plus the native renderer's shader library (14.6 MB);
         # work: 253 MB of generated C++, 378 MB of objects (kept for "Update game"), the PCH.
         "space": {"game_mb": 6815, "work_mb": 1000, "install_mb": 300},
-        "inputs": {"xex": {"path": "${GAME}/game/default.xex", "sha256": [xex_sha256]}},
+        "inputs": {"xex": {"path": "${GAME}/game/default.xex", "sha256": xex_sha256s}},
         "vars": {"CXXFLAGS": cxx, "PPCFLAGS": ppcflags, "PCH": pch},
         "jobs": {"max_rss_mb": 400, "reserve_mb": 768},
         "steps": [
             {"id": "extract", "kind": "extract", "label": "Extracting game files", "weight": 120,
              "format": "xiso", "to": "${GAME}", "keeps_game": True},
             {"id": "check-xex", "kind": "verify", "label": "Checking game version", "weight": 1,
-             "files": {"${GAME}/game/default.xex": [xex_sha256]},
+             "files": {"${GAME}/game/default.xex": xex_sha256s},
              "message": "unsupported_game_version"},
             # The native renderer's shader library from the game's own shaders (libshaderlib.so,
             # XenosRecomp and DXC: about 11 s on an S25). Again on every "Update game": a new
@@ -305,7 +310,7 @@ def stage(build, kit, out):
     runtime = [build / l for l in libs if Path(l).name == "libdaodroid-runtime.a"]
     if not runtime:
         sys.exit("The game library doesn't link libdaodroid-runtime.a")
-    xex_sha256, headers = read_inputs()
+    xex_sha256s, headers = read_inputs()
 
     shutil.rmtree(out, ignore_errors=True)
     (out / "lib").mkdir(parents=True)
@@ -328,7 +333,7 @@ def stage(build, kit, out):
 
     write_licenses(out / "licenses")
 
-    r = recipe(kit, xex_sha256, headers)
+    r = recipe(kit, xex_sha256s, headers)
     (out / "recipe.json").write_text(json.dumps(r, indent=2) + "\n", encoding="utf-8", newline="\n")
     return r
 

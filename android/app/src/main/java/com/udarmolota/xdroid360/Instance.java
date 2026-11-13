@@ -59,10 +59,22 @@ final class Instance {
     /** The languages each disc has text for ([game] language, read by both games' runtimes). */
     private static final String[] DAO_LANGUAGES = { "english", "italian", "spanish" };
     private static final String[] SOD_LANGUAGES = { "english", "french", "german", "italian", "spanish" };
+    /** Dragon Age's languages and the talk table each needs (core_<locale>.tlk). */
+    private static final String[][] DAO_TALK_TABLES = {
+            { "english", "en-us" }, { "italian", "it-it" }, { "spanish", "es-es" }, { "russian", "ru-ru" } };
 
-    /** This game's languages, for the settings' language card. */
+    /**
+     * This game's languages, for the settings' language card. Dragon Age offers the ones its disc has
+     * text for: English, Italian and Spanish on the usual disc, Russian on the Russian one.
+     */
     String[] languages() {
-        return SOD_TITLE_ID.equals(titleId()) ? SOD_LANGUAGES : DAO_LANGUAGES;
+        if (SOD_TITLE_ID.equals(titleId())) return SOD_LANGUAGES;
+        File talk = new File(game(), "packages/core/data/talktables");
+        java.util.List<String> has = new java.util.ArrayList<>();
+        for (String[] l : DAO_TALK_TABLES) {
+            if (new File(talk, "core_" + l[1] + ".tlk").isFile()) has.add(l[0]);
+        }
+        return has.isEmpty() ? DAO_LANGUAGES : has.toArray(new String[0]);
     }
 
     /** A language's name in that language, as the card shows it. */
@@ -73,6 +85,7 @@ final class Instance {
             case "german": return "Deutsch";
             case "italian": return "Italiano";
             case "spanish": return "Español";
+            case "russian": return "Русский";
             default: return id;
         }
     }
@@ -366,8 +379,9 @@ final class Instance {
 
     /**
      * The language to start the game in: the chosen one if this game has it, else the phone's
-     * when the game has it, else English. A Russian phone gets State of Decay's Russian text
-     * (played as "french") only when it was made on this phone.
+     * when the game has it, else English, else the disc's first (the Russian disc has only
+     * Russian). A Russian phone gets State of Decay's Russian text (played as "french") only when
+     * it was made on this phone.
      */
     String languageToUse() {
         java.util.List<String> has = java.util.Arrays.asList(languages());
@@ -378,10 +392,11 @@ final class Instance {
             case "de": phone = "german"; break;
             case "it": phone = "italian"; break;
             case "es": phone = "spanish"; break;
-            case "ru": phone = hasRussianText() ? "french" : "english"; break;
+            case "ru": phone = hasRussianText() ? "french" : "russian"; break;
             default: phone = "english";
         }
-        return has.contains(phone) ? phone : "english";
+        if (has.contains(phone)) return phone;
+        return has.contains("english") ? "english" : has.get(0);
     }
 
     /** name, or "name 2", "name 3"... if another instance already has it. */
