@@ -41,6 +41,9 @@ public class VirtualPadView extends View {
 
     private boolean shown = true;
     private boolean editing = false;
+    // A physical gamepad is in use (GameActivity): nothing is drawn, not even the V switch, until
+    // the screen is touched again.
+    private boolean gamepadInUse;
     private long toggleDownTime;
     private final Paint editStroke = new Paint(Paint.ANTI_ALIAS_FLAG);
     // Drag: which movable thing (a Button, or the strings "dpad", "left", "right") and the grab offset.
@@ -184,6 +187,20 @@ public class VirtualPadView extends View {
     }
 
     /** Select input mapping before the view joins the game: fixed pads or touch zones. */
+    /**
+     * A physical gamepad was connected or used (true), or the last one left (false). While one is
+     * in use the pad and its V switch step aside, so nothing covers the subtitles; a touch on the
+     * screen brings them back. Not while the layout is being edited.
+     */
+    public void setGamepadInUse(boolean on) {
+        if (gamepadInUse == on || (on && editing)) return;
+        gamepadInUse = on;
+        if (on) { // drop everything held
+            for (int i = 0; i < MAX_POINTERS; i++) if (element[i] != NONE) release(i);
+        }
+        invalidate();
+    }
+
     public void setControlMode(boolean touch) {
         touchMode = touch;
         invalidate();
@@ -267,6 +284,7 @@ public class VirtualPadView extends View {
 
     @Override
     protected void onDraw(Canvas canvas) {
+        if (gamepadInUse && !editing) return;
         // The switch.
         canvas.drawCircle(toggleCx, toggleCy, toggleR, shown ? fill : pressedFill);
         canvas.drawCircle(toggleCx, toggleCy, toggleR, stroke);
@@ -365,6 +383,11 @@ public class VirtualPadView extends View {
             case MotionEvent.ACTION_DOWN:
             case MotionEvent.ACTION_POINTER_DOWN: {
                 float x = event.getX(index), y = event.getY(index);
+                if (gamepadInUse) { // the first touch only brings the pad back
+                    gamepadInUse = false;
+                    invalidate();
+                    return true;
+                }
                 if (Math.hypot(x - toggleCx, y - toggleCy) <= toggleR * 1.3f) {
                     element[id] = TOGGLE;
                     toggleDownTime = event.getEventTime();

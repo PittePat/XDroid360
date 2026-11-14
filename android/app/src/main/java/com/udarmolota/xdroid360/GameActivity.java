@@ -164,13 +164,64 @@ public class GameActivity extends SDLActivity {
         hideSystemBars();
         // The on-screen gamepad over SDL's surface (mLayout holds the surface).
         if (mLayout != null) {
-            VirtualPadView pad = new VirtualPadView(this, current != null ? current.id : null);
+            pad = new VirtualPadView(this, current != null ? current.id : null);
             pad.setVibrateOnTouch(current != null && current.vibrateOnTouch);
             pad.setControlMode(current != null && Instance.CONTROLS_TOUCH.equals(current.controlMode));
             mLayout.addView(pad, new android.view.ViewGroup.LayoutParams(
                     android.view.ViewGroup.LayoutParams.MATCH_PARENT, android.view.ViewGroup.LayoutParams.MATCH_PARENT));
             setUpPerfOverlay();
+            watchGamepads();
         }
+    }
+
+    // A physical gamepad (Bluetooth, USB, or a handheld's own controls): while one is connected
+    // and used, the on-screen pad and its V switch step aside (VirtualPadView.setGamepadInUse);
+    // a touch on the screen brings them back, and the gamepad's next press hides them again.
+    private VirtualPadView pad;
+    private android.hardware.input.InputManager.InputDeviceListener gamepadListener;
+
+    private static boolean fromGamepad(int source) {
+        return (source & android.view.InputDevice.SOURCE_GAMEPAD) == android.view.InputDevice.SOURCE_GAMEPAD
+                || (source & android.view.InputDevice.SOURCE_JOYSTICK) == android.view.InputDevice.SOURCE_JOYSTICK;
+    }
+
+    private static boolean isGamepad(android.view.InputDevice device) {
+        return device != null && !device.isVirtual() && fromGamepad(device.getSources());
+    }
+
+    private static boolean anyGamepad() {
+        for (int id : android.view.InputDevice.getDeviceIds()) {
+            if (isGamepad(android.view.InputDevice.getDevice(id))) return true;
+        }
+        return false;
+    }
+
+    private void watchGamepads() {
+        android.hardware.input.InputManager input = getSystemService(android.hardware.input.InputManager.class);
+        if (input == null) return;
+        gamepadListener = new android.hardware.input.InputManager.InputDeviceListener() {
+            @Override public void onInputDeviceAdded(int id) {
+                if (isGamepad(android.view.InputDevice.getDevice(id))) pad.setGamepadInUse(true);
+            }
+            @Override public void onInputDeviceRemoved(int id) {
+                if (!anyGamepad()) pad.setGamepadInUse(false);
+            }
+            @Override public void onInputDeviceChanged(int id) { }
+        };
+        input.registerInputDeviceListener(gamepadListener, new Handler(Looper.getMainLooper()));
+        if (anyGamepad()) pad.setGamepadInUse(true);
+    }
+
+    @Override
+    public boolean dispatchKeyEvent(android.view.KeyEvent event) {
+        if (pad != null && fromGamepad(event.getSource())) pad.setGamepadInUse(true);
+        return super.dispatchKeyEvent(event);
+    }
+
+    @Override
+    public boolean dispatchGenericMotionEvent(android.view.MotionEvent event) {
+        if (pad != null && fromGamepad(event.getSource())) pad.setGamepadInUse(true);
+        return super.dispatchGenericMotionEvent(event);
     }
 
     // Full screen, set by the activity itself before the window is laid out (as in ValDroid).
@@ -371,6 +422,11 @@ public class GameActivity extends SDLActivity {
 
     @Override
     protected void onDestroy() {
+        if (gamepadListener != null) {
+            android.hardware.input.InputManager input = getSystemService(android.hardware.input.InputManager.class);
+            if (input != null) input.unregisterInputDeviceListener(gamepadListener);
+            gamepadListener = null;
+        }
         surfaceRecoveryPending = false;
         surfaceRecoveryHandler.removeCallbacks(surfaceRecoveryTask);
         super.onDestroy();
