@@ -1,2 +1,3 @@
 # The profile build hashes these headers: their bytes must not change at checkout.
 profiles/dao/ppc/*.h -text
+profiles/dao/ppc_tu/*.h -text
