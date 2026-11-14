@@ -39,7 +39,7 @@ RECOMP = ROOT / "recomp"
 LLVM = RECOMP / "tools" / "llvm" / "bin"
 NINJA = RECOMP / "tools" / "ninja" / ("ninja.exe" if os.name == "nt" else "ninja")
 DEFAULT_KIT = ROOT.parent / "SD1" / "toolchain" / "out" / "kit"
-VERSION = "dao-3"
+VERSION = "dao-4"
 TITLE_ID = "454108C0"
 # Linked whole into dao-game, or compiled on the phone: not in dao-deps.
 # libdxbc.a: Xenia's DXBC checksum (AMD, no licence grant) is D3D12-only: the Vulkan build never
@@ -166,7 +166,10 @@ def read_inputs():
     xex = (INPUTS / "default.xex.sha256").read_text(encoding="utf-8").split()
     if not xex or not all(re.fullmatch(r"[0-9a-f]{64}", h) for h in xex):
         sys.exit(f"{INPUTS / 'default.xex.sha256'} holds no SHA-256, or something else")
-    return xex, {h: sha256(INPUTS / "ppc" / h) for h in ("ppc_config.h", "ppc_context.h")}
+    heads = ("ppc_config.h", "ppc_context.h")
+    # ppc_tu/: the same two headers from Title Update 6's or 7's translation (config/DAO_tu6.toml).
+    return (xex, {h: sha256(INPUTS / "ppc" / h) for h in heads},
+            {h: sha256(INPUTS / "ppc_tu" / h) for h in heads})
 
 
 def refresh_inputs():
@@ -192,31 +195,110 @@ def merge(archives, out):
     subprocess.run([exe("llvm-strip"), "-g", str(out)], check=True)
 
 
-def toml_template():
-    """config/DAO.toml with its paths pointing at the phone's folders (absolute, as is)."""
-    text = (RECOMP / "config" / "DAO.toml").read_text(encoding="utf-8")
-    for key, value in (("file_path", "${GAME}/game/default.xex"), ("out_directory_path", "${WORK}/ppc"),
-                       ("switch_table_file_path", "${PROFILE}/xr/DAO_switch_tables.toml")):
+def toml_template(tu=False):
+    """config/DAO.toml (or DAO_tu6.toml, with the title update's patch) with its paths pointing at
+    the phone's folders (absolute, as is)."""
+    name = "DAO_tu6" if tu else "DAO"
+    text = (RECOMP / "config" / f"{name}.toml").read_text(encoding="utf-8")
+    keys = [("file_path", "${GAME}/game/default.xex"),
+            ("out_directory_path", "${WORK}/ppc_tu" if tu else "${WORK}/ppc"),
+            ("switch_table_file_path", f"${{PROFILE}}/xr/{name}_switch_tables.toml")]
+    if tu:
+        keys.append(("patch_file_path", "${GAME}/title_update/default.xexp"))
+    for key, value in keys:
         text, n = re.subn(rf"^{key}\s*=.*$", f'{key} = "{value}"', text, count=1, flags=re.M)
         if n != 1:
-            sys.exit(f"config/DAO.toml has no {key}")
+            sys.exit(f"config/{name}.toml has no {key}")
     return text
 
 
-def recipe(kit, xex_sha256s, headers):
+def recipe(kit, xex_sha256s, headers, headers_tu):
     cxx = ["--target=aarch64-none-linux-android29", "--sysroot=${KIT}/sysroot",
            "-resource-dir", "${KIT}/clang/22",
            "-DANDROID", "-fdata-sections", "-ffunction-sections", "-funwind-tables",
            "-fstack-protector-strong", "-D_FORTIFY_SOURCE=2", "-O3", "-DNDEBUG",
            "-std=gnu++20", "-fPIC"]
-    ppcflags = ["-fno-strict-aliasing", "-ffp-model=strict", "-ffp-contract=off",
+
+    def ppcflags(ppc):
+        return ["-fno-strict-aliasing", "-ffp-model=strict", "-ffp-contract=off",
                 "-Wno-unused-label", "-Wno-unused-variable", "-Wno-unused-but-set-variable",
-                "-I${WORK}/ppc", "-I${PROFILE}/include/simde",
+                f"-I{ppc}", "-I${PROFILE}/include/simde",
                 "-include", "${PROFILE}/include/mmio_hook.h"]
-    pch = ["-Xclang", "-include-pch", "-Xclang", "${WORK}/pch/pch.hxx.pch",
-           "-Xclang", "-include", "-Xclang", "${WORK}/pch/pch.hxx"]
+
+    def pch(folder):
+        return ["-Xclang", "-include-pch", "-Xclang", f"{folder}/pch.hxx.pch",
+                "-Xclang", "-include", "-Xclang", f"{folder}/pch.hxx"]
+
     builtins = "${KIT}/clang/lib/libclang_rt.builtins-aarch64-android.a"
     lib = "${KIT}/sysroot/usr/lib/aarch64-linux-android"
+    update = "${GAME}/title_update/default.xexp"
+
+    def code_steps(tu):
+        """Translating, compiling and linking the game's code: the disc's, or with Title Update 6 or
+        7 installed (${GAME}/title_update, where the STFS reader puts it) only the title update's,
+        in folders of its own, linked with the runtime built for it (libdao-game-tu.a,
+        DAO_TU_ONLY). Exactly one of the two sets runs, by whether the title update is there."""
+        s = "-tu" if tu else ""
+        ppc = "${WORK}/ppc" + ("_tu" if tu else "")
+        pch_dir = "${WORK}/pch" + ("_tu" if tu else "")
+        heads = headers_tu if tu else headers
+        when = {"exists": update} if tu else {"missing": update}
+        toml = "DAO_tu6.toml" if tu else "DAO.toml"
+        steps = [
+            {"id": "xr-config" + s, "kind": "write", "weight": 0, "creates": ["${WORK}/xr"],
+             "path": "${WORK}/xr/" + toml, "from": "${PROFILE}/xr/" + toml + ".in"},
+            {"id": "recomp" + s, "kind": "run", "label": "Translating game code", "weight": 10,
+             "tool": "xenonrecomp", "args": ["${WORK}/xr/" + toml, "${PROFILE}/xr/ppc_context.h"],
+             "creates": [ppc], "progress": "Recompiling functions\\.\\.\\. ([0-9.]+)%"},
+            # The prebuilt runtime is compiled against these generated headers (stdafx.h).
+            {"id": "check-generated" + s, "kind": "verify", "weight": 0,
+             "files": {ppc + "/ppc_config.h": [heads["ppc_config.h"]],
+                       ppc + "/ppc_context.h": [heads["ppc_context.h"]]},
+             "message": "profile_mismatch"},
+            {"id": "pch-stub" + s, "kind": "write", "weight": 0, "creates": [pch_dir],
+             "path": pch_dir + "/pch.hxx",
+             "text": "#pragma clang system_header\n#include \"" + ppc + "/ppc_recomp_shared.h\"\n"},
+            {"id": "pch" + s, "kind": "run", "label": "Preparing compiler", "weight": 2, "tool": "clang",
+             "args": ["@CXXFLAGS"] + ppcflags(ppc) + ["-x", "c++-header", pch_dir + "/pch.hxx",
+                                                      "-o", pch_dir + "/pch.hxx.pch"]},
+            {"id": "game-code" + s, "kind": "each", "label": "Compiling game code", "weight": 180,
+             "tool": "clang",
+             "inputs": {"glob": ppc + "/ppc_recomp.*.cpp", "plus": [ppc + "/ppc_func_mapping.cpp"]},
+             "args": ["@CXXFLAGS"] + ppcflags(ppc) + pch(pch_dir) + ["-c", "${IN}", "-o", "${OBJ}"],
+             "objects": "${WORK}/obj/game-code" + s,
+             "schedule": "longest_first", "cost_hints": {} if tu else COST_HINTS, "fail": "stop"},
+            {"id": "build-info" + s, "kind": "each", "label": "Compiling game code", "weight": 2,
+             "tool": "clang",
+             "inputs": {"plus": ["${PROFILE}/include/build_info_android.cpp"]},
+             "args": ["@CXXFLAGS", f"-I{ppc}", "-I${PROFILE}/include", "-I${PROFILE}/include/simde"]
+                     + (["-DDAO_HAS_TU6=1"] if tu else [])
+                     + ["-DDAO_BUILD_INFO=" + ("DaoBuildTu6" if tu else "DaoBuildDisc"),
+                        "-DDAO_BUILD_MAPPINGS=PPCFuncMappings", "-c", "${IN}", "-o", "${OBJ}"],
+             "objects": "${WORK}/obj/build-info" + s},
+            {"id": "link" + s, "kind": "run", "label": "Linking", "weight": 8, "tool": "lld",
+             "message": "link_failed",
+             "args": ["-flavor", "gnu",
+                      "--sysroot=${KIT}/sysroot", "-EL", "--fix-cortex-a53-843419",
+                      "-z", "now", "-z", "relro", "-z", "max-page-size=16384",
+                      "--hash-style=gnu", "--eh-frame-hdr", "-m", "aarch64linux", "-shared",
+                      "-soname", "libgame.so", "--build-id=sha1", "--no-rosegment",
+                      "--no-undefined", "--gc-sections", "-Bsymbolic", "--strip-debug",
+                      "-o", "${WORK}/libgame.so",
+                      lib + "/29/crtbegin_so.o", "-L" + lib + "/29", "-L" + lib,
+                      "--whole-archive", "${PROFILE}/lib/libdao-game" + s + ".a", "--no-whole-archive",
+                      "@objects:build-info" + s, "@objects:game-code" + s,
+                      "${PROFILE}/lib/libdao-deps.a",
+                      "${TOOLS}/libSDL3.so",
+                      "-landroid", "-llog", "-ldl", "-latomic", "-lm",
+                      "-Bstatic", "-lc++", "-Bdynamic", "-lm",
+                      builtins, "-l:libunwind.a", "-ldl", "-lc",
+                      builtins, "-l:libunwind.a", "-ldl",
+                      lib + "/29/crtend_so.o"]},
+        ]
+        for step in steps:
+            step["when"] = when
+        return steps
+
     return {
         "format": 2,
         "version": VERSION,
@@ -228,7 +310,7 @@ def recipe(kit, xex_sha256s, headers):
         # work: 253 MB of generated C++, 378 MB of objects (kept for "Update game"), the PCH.
         "space": {"game_mb": 6815, "work_mb": 1000, "install_mb": 300},
         "inputs": {"xex": {"path": "${GAME}/game/default.xex", "sha256": xex_sha256s}},
-        "vars": {"CXXFLAGS": cxx, "PPCFLAGS": ppcflags, "PCH": pch},
+        "vars": {"CXXFLAGS": cxx},
         "jobs": {"max_rss_mb": 400, "reserve_mb": 768},
         "steps": [
             {"id": "extract", "kind": "extract", "label": "Extracting game files", "weight": 120,
@@ -244,55 +326,7 @@ def recipe(kit, xex_sha256s, headers):
              "args": ["${GAME}/game/packages/core/data/shaders.erf", "${GAME}/userdata/nfsmw_shaders.nfsp",
                       "-j", "${JOBS}"],
              "progress": "progress ([0-9]+)/([0-9]+)"},
-            {"id": "xr-config", "kind": "write", "weight": 0, "creates": ["${WORK}/xr"],
-             "path": "${WORK}/xr/DAO.toml", "from": "${PROFILE}/xr/DAO.toml.in"},
-            {"id": "recomp", "kind": "run", "label": "Translating game code", "weight": 10,
-             "tool": "xenonrecomp", "args": ["${WORK}/xr/DAO.toml", "${PROFILE}/xr/ppc_context.h"],
-             "creates": ["${WORK}/ppc"], "progress": "Recompiling functions\\.\\.\\. ([0-9.]+)%"},
-            # The prebuilt runtime is compiled against these generated headers (stdafx.h).
-            {"id": "check-generated", "kind": "verify", "weight": 0,
-             "files": {"${WORK}/ppc/ppc_config.h": [headers["ppc_config.h"]],
-                       "${WORK}/ppc/ppc_context.h": [headers["ppc_context.h"]]},
-             "message": "profile_mismatch"},
-            {"id": "pch-stub", "kind": "write", "weight": 0, "creates": ["${WORK}/pch"],
-             "path": "${WORK}/pch/pch.hxx",
-             "text": "#pragma clang system_header\n#include \"${WORK}/ppc/ppc_recomp_shared.h\"\n"},
-            {"id": "pch", "kind": "run", "label": "Preparing compiler", "weight": 2, "tool": "clang",
-             "args": ["@CXXFLAGS", "@PPCFLAGS", "-x", "c++-header", "${WORK}/pch/pch.hxx",
-                      "-o", "${WORK}/pch/pch.hxx.pch"]},
-            {"id": "game-code", "kind": "each", "label": "Compiling game code", "weight": 180,
-             "tool": "clang",
-             "inputs": {"glob": "${WORK}/ppc/ppc_recomp.*.cpp", "plus": ["${WORK}/ppc/ppc_func_mapping.cpp"]},
-             "args": ["@CXXFLAGS", "@PPCFLAGS", "@PCH", "-c", "${IN}", "-o", "${OBJ}"],
-             "objects": "${WORK}/obj/game-code",
-             "schedule": "longest_first", "cost_hints": COST_HINTS, "fail": "stop"},
-            {"id": "build-info", "kind": "each", "label": "Compiling game code", "weight": 2,
-             "tool": "clang",
-             "inputs": {"plus": ["${PROFILE}/include/build_info_android.cpp"]},
-             "args": ["@CXXFLAGS", "-I${WORK}/ppc", "-I${PROFILE}/include", "-I${PROFILE}/include/simde",
-                      "-DDAO_BUILD_INFO=DaoBuildDisc", "-DDAO_BUILD_MAPPINGS=PPCFuncMappings",
-                      "-c", "${IN}", "-o", "${OBJ}"],
-             "objects": "${WORK}/obj/build-info"},
-            {"id": "link", "kind": "run", "label": "Linking", "weight": 8, "tool": "lld",
-             "message": "link_failed",
-             "args": ["-flavor", "gnu",
-                      "--sysroot=${KIT}/sysroot", "-EL", "--fix-cortex-a53-843419",
-                      "-z", "now", "-z", "relro", "-z", "max-page-size=16384",
-                      "--hash-style=gnu", "--eh-frame-hdr", "-m", "aarch64linux", "-shared",
-                      "-soname", "libgame.so", "--build-id=sha1", "--no-rosegment",
-                      "--no-undefined", "--gc-sections", "-Bsymbolic", "--strip-debug",
-                      "-o", "${WORK}/libgame.so",
-                      lib + "/29/crtbegin_so.o", "-L" + lib + "/29", "-L" + lib,
-                      "--whole-archive", "${PROFILE}/lib/libdao-game.a", "--no-whole-archive",
-                      "@objects:build-info", "@objects:game-code",
-                      "${PROFILE}/lib/libdao-deps.a",
-                      "${TOOLS}/libSDL3.so",
-                      "-landroid", "-llog", "-ldl", "-latomic", "-lm",
-                      "-Bstatic", "-lc++", "-Bdynamic", "-lm",
-                      builtins, "-l:libunwind.a", "-ldl", "-lc",
-                      builtins, "-l:libunwind.a", "-ldl",
-                      lib + "/29/crtend_so.o"]},
-        ],
+        ] + code_steps(False) + code_steps(True),
         "result": {"library": "${WORK}/libgame.so", "install": "${INSTANCE}/libgame.so", "keep": ["${WORK}/logs"]},
     }
 
@@ -304,17 +338,20 @@ def abi_version():
 
 def stage(build, kit, out):
     libs = link_libraries(build)
-    targets = ["dao-front"] + libs
+    targets = ["dao-front", "dao-front-tu", "runtime/libdaodroid-runtime-tu.a"] + libs
     subprocess.run([str(NINJA) if NINJA.is_file() else "ninja", "-C", str(build)] + targets, check=True)
     deps = [build / l for l in libs if Path(l).name not in NOT_DEPS]
     runtime = [build / l for l in libs if Path(l).name == "libdaodroid-runtime.a"]
     if not runtime:
         sys.exit("The game library doesn't link libdaodroid-runtime.a")
-    xex_sha256s, headers = read_inputs()
+    xex_sha256s, headers, headers_tu = read_inputs()
 
     shutil.rmtree(out, ignore_errors=True)
     (out / "lib").mkdir(parents=True)
     merge([build / "libdao-front.a"] + runtime, out / "lib" / "libdao-game.a")
+    # The runtime and the front end for a game built with Title Update 6 or 7 (DAO_TU_ONLY).
+    merge([build / "libdao-front-tu.a", build / "runtime" / "libdaodroid-runtime-tu.a"],
+          out / "lib" / "libdao-game-tu.a")
     merge(deps, out / "lib" / "libdao-deps.a")
 
     inc = out / "include"
@@ -329,11 +366,13 @@ def stage(build, kit, out):
     xr.mkdir()
     (xr / "DAO.toml.in").write_text(toml_template(), encoding="utf-8", newline="\n")
     shutil.copy2(RECOMP / "config" / "DAO_switch_tables.toml", xr / "DAO_switch_tables.toml")
+    (xr / "DAO_tu6.toml.in").write_text(toml_template(tu=True), encoding="utf-8", newline="\n")
+    shutil.copy2(RECOMP / "config" / "DAO_tu6_switch_tables.toml", xr / "DAO_tu6_switch_tables.toml")
     shutil.copy2(RECOMP / "tools" / "XenonRecomp" / "XenonUtils" / "ppc_context.h", xr / "ppc_context.h")
 
     write_licenses(out / "licenses")
 
-    r = recipe(kit, xex_sha256s, headers)
+    r = recipe(kit, xex_sha256s, headers, headers_tu)
     (out / "recipe.json").write_text(json.dumps(r, indent=2) + "\n", encoding="utf-8", newline="\n")
     return r
 

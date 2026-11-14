@@ -108,3 +108,10 @@ endif()
 add_library(dao-front STATIC EXCLUDE_FROM_ALL ${DAO_FRONT_SOURCES})
 target_compile_options(dao-front PRIVATE ${DAO_RUNTIME_OPTIONS})
 target_link_libraries(dao-front PRIVATE daodroid-runtime SDL3::SDL3 linkernsbypass)
+# The front end for a game built with Title Update 6 or 7, with the runtime built for it
+# (daodroid-runtime-tu: DAO_TU_ONLY): the game build headers it includes (kernel/game_build.h)
+# must agree with that runtime's.
+add_library(dao-front-tu STATIC EXCLUDE_FROM_ALL ${DAO_FRONT_SOURCES})
+target_compile_options(dao-front-tu PRIVATE ${DAO_RUNTIME_OPTIONS} -include ${CMAKE_BINARY_DIR}/tu6_names.h)
+target_compile_definitions(dao-front-tu PRIVATE DAO_HAS_TU6=1 DAO_TU_ONLY=1)
+target_link_libraries(dao-front-tu PRIVATE daodroid-runtime-tu SDL3::SDL3 linkernsbypass)

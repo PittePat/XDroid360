@@ -648,6 +648,7 @@ final class RecipeRunner {
         JSONObject when = step.optJSONObject("when");
         if (when == null) return true;
         if (when.has("exists")) return new File(vars.text(when.optString("exists"))).exists();
+        if (when.has("missing")) return !new File(vars.text(when.optString("missing"))).exists();
         return true;
     }
 

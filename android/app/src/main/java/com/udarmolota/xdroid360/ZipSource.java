@@ -177,6 +177,14 @@ final class ZipSource implements Closeable {
         return out;
     }
 
+    /** Every file in the zip, sorted by name. */
+    List<ZipEntry> files() {
+        List<ZipEntry> out = new ArrayList<>();
+        for (ZipEntry e : entries.values()) if (!e.isDirectory()) out.add(e);
+        out.sort((a, b) -> a.getName().compareTo(b.getName()));
+        return out;
+    }
+
     /** A package's title ID folder (upper case), or "" when the zip holds the title folder's content. */
     static String titleId(ZipEntry e) {
         Matcher m = PACKAGE.matcher(e.getName());

@@ -38,7 +38,6 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.function.BiConsumer;
 
 /**
  * The launcher: the installed games (instances) as cards (the game's own splash from the
@@ -55,9 +54,11 @@ public class LauncherActivity extends AppCompatActivity {
     private DrawerLayout drawer;
     private final Handler ui = new Handler(Looper.getMainLooper());
 
-    // The document pickers, with what to do with the pick (set just before launching).
-    private BiConsumer<Instance, Uri> onPick;
-    private Instance pickFor;
+    // The document pickers, with the game and what to do with the pick (set just before
+    // launching). Kept as ids and names in the saved state: Android may restart the launcher
+    // while a picker is open (big files, little memory), and the pick comes back to the new one.
+    private String pickForId, pickKind, exportForId, dlcForId;
+    private static final String PICK_SAVES = "saves", PICK_PAD = "pad", PICK_DRIVER = "driver";
     // "Add game": a disc image, or a folder of packages (by the games' recipes, source.pick).
     private final ActivityResultLauncher<String[]> pickImage =
             registerForActivityResult(new ActivityResultContracts.OpenDocument(), uri -> {
@@ -67,26 +68,58 @@ public class LauncherActivity extends AppCompatActivity {
             registerForActivityResult(new ActivityResultContracts.OpenDocumentTree(), uri -> {
                 if (uri != null) build(uri, "tree");
             });
-    private Instance exportFor;
     private final ActivityResultLauncher<String> exportSaves =
             registerForActivityResult(new ActivityResultContracts.CreateDocument("application/zip"), uri -> {
-                if (uri != null && exportFor != null) InstanceActions.exportSaves(this, exportFor, uri);
+                Instance i = instanceById(exportForId);
+                if (uri != null && i != null) InstanceActions.exportSaves(this, i, uri);
             });
     private final ActivityResultLauncher<String> exportPad =
             registerForActivityResult(new ActivityResultContracts.CreateDocument("application/json"), uri -> {
-                if (uri != null && exportFor != null) exportPadTo(exportFor, uri);
+                Instance i = instanceById(exportForId);
+                if (uri != null && i != null) exportPadTo(i, uri);
             });
     private final ActivityResultLauncher<String[]> pickFile =
             registerForActivityResult(new ActivityResultContracts.OpenDocument(), uri -> {
-                if (uri != null && onPick != null && pickFor != null) {
-                    onPick.accept(pickFor, uri);
+                Instance i = instanceById(pickForId);
+                Install install = installFor(pickKind);
+                if (uri != null && i != null && install != null) {
+                    install.run(this, i, uri);
                     refresh();
                 }
             });
 
     @Override
+    protected void onSaveInstanceState(Bundle out) {
+        super.onSaveInstanceState(out);
+        out.putString("pick_for", pickForId);
+        out.putString("pick_kind", pickKind);
+        out.putString("export_for", exportForId);
+        out.putString("dlc_for", dlcForId);
+    }
+
+    /** The game with this id, read again from disk (the list may not be loaded yet), or null. */
+    private Instance instanceById(String id) {
+        if (id == null) return null;
+        for (Instance i : Instance.list(this)) if (i.id.equals(id)) return i;
+        return null;
+    }
+
+    private static Install installFor(String kind) {
+        if (PICK_SAVES.equals(kind)) return InstanceActions::installSaves;
+        if (PICK_PAD.equals(kind)) return LauncherActivity::importPadFrom;
+        if (PICK_DRIVER.equals(kind)) return InstanceActions::installDriver;
+        return null;
+    }
+
+    @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        if (savedInstanceState != null) { // a picker's target, if Android restarted the launcher meanwhile
+            pickForId = savedInstanceState.getString("pick_for");
+            pickKind = savedInstanceState.getString("pick_kind");
+            exportForId = savedInstanceState.getString("export_for");
+            dlcForId = savedInstanceState.getString("dlc_for");
+        }
         setContentView(R.layout.activity_launcher);
         drawer = findViewById(R.id.drawer);
         MaterialToolbar toolbar = findViewById(R.id.toolbar);
@@ -185,7 +218,10 @@ public class LauncherActivity extends AppCompatActivity {
         for (int card : new int[] { R.id.transfer_game_card, R.id.transfer_saves_card, R.id.transfer_pad_card }) {
             findViewById(card).setVisibility(none ? View.GONE : View.VISIBLE);
         }
-        if (none) return;
+        if (none) {
+            findViewById(R.id.transfer_dlc_card).setVisibility(View.GONE);
+            return;
+        }
         // The game picked before (refresh() makes new Instance objects: matched by id).
         Instance again = instances.get(0);
         for (Instance i : instances) if (transferFor != null && i.id.equals(transferFor.id)) again = i;
@@ -202,7 +238,15 @@ public class LauncherActivity extends AppCompatActivity {
             group.addView(b);
             if (i == transferFor) group.check(b.getId());
         }
-        group.setOnCheckedChangeListener((g, checked) -> transferFor = (Instance) g.findViewById(checked).getTag());
+        group.setOnCheckedChangeListener((g, checked) -> {
+            transferFor = (Instance) g.findViewById(checked).getTag();
+            showDlcCard();
+        });
+        showDlcCard();
+        findViewById(R.id.transfer_dlc).setOnClickListener(v -> {
+            dlcForId = transferFor.id;
+            pickDlc.launch(new String[] { "*/*" });
+        });
 
         ((TextView) findViewById(R.id.transfer_saves_hint)).setText(
                 transferExport ? R.string.transfer_saves_export_hint : R.string.transfer_saves_import_hint);
@@ -213,16 +257,110 @@ public class LauncherActivity extends AppCompatActivity {
         ((TextView) findViewById(R.id.transfer_pad)).setText(button);
         findViewById(R.id.transfer_saves).setOnClickListener(v -> {
             if (transferExport) exportSavesOf(transferFor);
-            else pick(transferFor, InstanceActions::installSaves);
+            else pick(transferFor, PICK_SAVES);
         });
         findViewById(R.id.transfer_pad).setOnClickListener(v -> {
             if (transferExport) {
-                exportFor = transferFor;
+                exportForId = transferFor.id;
                 exportPad.launch(padFileName(transferFor));
             } else {
-                pick(transferFor, LauncherActivity::importPadFrom);
+                pick(transferFor, PICK_PAD);
             }
         });
+    }
+
+    // -------------------- Dragon Age's downloadable content (Import tab) --------------------
+
+    private final ActivityResultLauncher<String[]> pickDlc =
+            registerForActivityResult(new ActivityResultContracts.OpenMultipleDocuments(), uris -> {
+                Instance i = instanceById(dlcForId);
+                if (i == null) i = onlyDao(); // no id kept: the one Dragon Age, if there's one
+                if (uris != null && !uris.isEmpty() && i != null) installDlc(i, uris);
+            });
+
+    private Instance onlyDao() {
+        Instance found = null;
+        for (Instance i : Instance.list(this)) {
+            if (!Instance.DAO_TITLE_ID.equals(i.titleId())) continue;
+            if (found != null) return null;
+            found = i;
+        }
+        return found;
+    }
+
+    /** The DLC card: on Import, for Dragon Age: Origins (the one game with DLC to add). */
+    private void showDlcCard() {
+        boolean dao = transferFor != null && Instance.DAO_TITLE_ID.equals(transferFor.titleId());
+        findViewById(R.id.transfer_dlc_card).setVisibility(!transferExport && dao ? View.VISIBLE : View.GONE);
+    }
+
+    /** Installs the picked packages in the background, with a progress dialog, then says what happened. */
+    private void installDlc(Instance instance, java.util.List<Uri> uris) {
+        java.util.concurrent.atomic.AtomicBoolean cancelled = new java.util.concurrent.atomic.AtomicBoolean();
+        LinearProgressIndicator bar = new LinearProgressIndicator(this);
+        bar.setIndeterminate(true);
+        TextView what = new TextView(this);
+        android.widget.LinearLayout box = new android.widget.LinearLayout(this);
+        box.setOrientation(android.widget.LinearLayout.VERTICAL);
+        int pad = (int) (24 * getResources().getDisplayMetrics().density);
+        box.setPadding(pad, pad / 2, pad, 0);
+        box.addView(what);
+        box.addView(bar);
+        androidx.appcompat.app.AlertDialog dialog = new com.google.android.material.dialog.MaterialAlertDialogBuilder(this)
+                .setTitle(R.string.dlc_working)
+                .setView(box)
+                .setCancelable(false)
+                .setNegativeButton(android.R.string.cancel, (d, w) -> cancelled.set(true))
+                .show();
+        getWindow().addFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
+        new Thread(() -> {
+            DlcInstaller.Result r = DlcInstaller.install(getApplicationContext(), instance, uris, (name, fraction) ->
+                    ui.post(() -> {
+                        what.setText(name);
+                        if (fraction < 0) {
+                            bar.setIndeterminate(true);
+                        } else {
+                            bar.setIndeterminate(false);
+                            bar.setProgressCompat((int) (fraction * 1000), false);
+                        }
+                    }), cancelled);
+            ui.post(() -> {
+                getWindow().clearFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
+                dialog.dismiss();
+                if (isFinishing() || cancelled.get()) return;
+                com.google.android.material.dialog.MaterialAlertDialogBuilder done =
+                        new com.google.android.material.dialog.MaterialAlertDialogBuilder(this)
+                                .setTitle(R.string.dlc_done)
+                                .setMessage(dlcSummary(r));
+                if (r.updateInstalled > 0) {
+                    // The game is built with the title update's code: "Update game" now, or later.
+                    done.setPositiveButton(R.string.instance_update, (d, w) -> InstanceActions.update(this, instance))
+                            .setNegativeButton(R.string.dlc_later, null);
+                } else {
+                    done.setPositiveButton(android.R.string.ok, null);
+                }
+                done.show();
+            });
+        }, "dlc-install").start();
+    }
+
+    private String dlcSummary(DlcInstaller.Result r) {
+        if (r.nothingFound()) return getString(R.string.dlc_nothing);
+        StringBuilder s = new StringBuilder();
+        if (r.updateInstalled > 0) line(s, getString(R.string.dlc_update_installed, r.updateInstalled));
+        else if (r.updateAlready) line(s, getString(R.string.dlc_update_already));
+        else if (r.updateUnknown) line(s, getString(R.string.dlc_update_unknown));
+        else if (r.updateOtherEdition) line(s, getString(R.string.dlc_update_other));
+        if (!r.installed.isEmpty()) line(s, getString(R.string.dlc_installed, String.join(", ", r.installed)));
+        if (!r.already.isEmpty()) line(s, getString(R.string.dlc_already, String.join(", ", r.already)));
+        if (!r.needUpdate.isEmpty()) line(s, getString(R.string.dlc_need_update, String.join(", ", r.needUpdate)));
+        if (!r.failed.isEmpty()) line(s, getString(R.string.dlc_failed, String.join("; ", r.failed)));
+        return s.toString();
+    }
+
+    private static void line(StringBuilder s, String text) {
+        if (s.length() > 0) s.append("\n\n");
+        s.append(text);
     }
 
     private static String padFileName(Instance i) {
@@ -333,7 +471,7 @@ public class LauncherActivity extends AppCompatActivity {
         if (id == R.id.action_add || id == R.id.nav_add) addGame();
         else if (id == R.id.action_help || id == R.id.nav_how) showHow();
         else if (id == R.id.nav_driver) InstanceActions.choose(this, R.string.nav_install_driver, instances,
-                i -> pick(i, InstanceActions::installDriver));
+                i -> pick(i, PICK_DRIVER));
         else if (id == R.id.nav_bug) bugReport(instances.isEmpty() ? null : instances.get(0));
         else if (id == R.id.nav_about) showAbout();
         else return false;
@@ -342,14 +480,14 @@ public class LauncherActivity extends AppCompatActivity {
 
     private interface Install { void run(LauncherActivity a, Instance i, Uri uri); }
 
-    private void pick(Instance i, Install install) {
-        pickFor = i;
-        onPick = (inst, uri) -> install.run(this, inst, uri);
+    private void pick(Instance i, String kind) {
+        pickForId = i.id;
+        pickKind = kind;
         pickFile.launch(new String[] { "*/*" });
     }
 
     private void exportSavesOf(Instance i) {
-        exportFor = i;
+        exportForId = i.id;
         exportSaves.launch(InstanceActions.savesFileName(i));
     }
 

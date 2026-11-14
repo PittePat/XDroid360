@@ -157,6 +157,25 @@ final class Xiso {
         return s.toString();
     }
 
+    /** Copies one file of the image to out (a package on a DLC disc, for DlcInstaller). */
+    void copy(Entry e, File out, Progress progress) throws IOException, Recipe.Failure {
+        ByteBuffer b = ByteBuffer.allocate(1 << 20);
+        long pos = base + e.sector * SECTOR, left = e.size, done = 0;
+        try (FileOutputStream o = new FileOutputStream(out); FileChannel w = o.getChannel()) {
+            while (left > 0) {
+                b.clear().limit((int) Math.min(left, b.capacity()));
+                int n = channel.read(b, pos);
+                if (n <= 0) throw new IOException("the disc image is truncated");
+                b.flip();
+                while (b.hasRemaining()) w.write(b);
+                pos += n;
+                left -= n;
+                done += n;
+                if (!progress.onProgress(done, e.size)) throw new Recipe.Failure("cancelled", "");
+            }
+        }
+    }
+
     /** The bytes extract() writes: every file the game reads. */
     long gameBytes() {
         long total = 0;
