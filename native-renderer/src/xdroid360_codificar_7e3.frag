@@ -12,6 +12,8 @@ layout(push_constant) uniform Constantes {
   ivec2 desplazamiento;  // source texel = destination pixel + desplazamiento
   int modo;              // 0 = write the 7e3 codes; 1 = only clamp to the format's range (a copy to a half
                          // float texture: the console's target cannot hold more than 31.875)
+  float escala;          // mode 1: the copy's exponent bias, 2^bias, applied after the clamp as the console's
+                         // resolve does (1.0 = none; xdroid360_sesgo_copias)
 } constantes;
 layout(location = 0) out vec4 salida;
 
@@ -35,7 +37,7 @@ void main() {
   if (constantes.modo == 1) {
     vec3 rgb = vec3(texel.r > 0.0 ? min(texel.r, 31.875) : 0.0, texel.g > 0.0 ? min(texel.g, 31.875) : 0.0,
                     texel.b > 0.0 ? min(texel.b, 31.875) : 0.0);
-    salida = vec4(rgb, texel.a > 0.0 ? min(texel.a, 1.0) : 0.0);
+    salida = vec4(rgb * constantes.escala, texel.a > 0.0 ? min(texel.a, 1.0) : 0.0);
     return;
   }
   vec3 codigo = vec3(float(Codificar7e3(texel.r)), float(Codificar7e3(texel.g)), float(Codificar7e3(texel.b)));

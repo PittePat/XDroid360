@@ -662,6 +662,7 @@ REXCVAR_DEFINE_BOOL(nfsmw_nativo_abanicos_a_listas, false, "NFSMW",
     .lifecycle(rex::cvar::Lifecycle::kInitOnly);
 
 REXCVAR_DECLARE(std::string, xdroid360_volcado_ps);
+REXCVAR_DECLARE(bool, xdroid360_tamano_por_fetch);
 REXCVAR_DEFINE_STRING(xdroid360_diag_omitir_vs, "", "NFSMW",
                       "XDroid360 (tests only): vertex shader numbers (comma-separated) whose draws are not "
                       "recorded, like nfsmw_nativo_diag_omitir_ps for pixel shaders");
@@ -8808,6 +8809,14 @@ class DibujosVulkanImpl final : public DibujosVulkan {
         // shimmered as the camera moved. Resolved textures report their size like any other.
         ancho_host_out = resuelta->ancho;
         alto_host_out = resuelta->alto;
+        // xdroid360_tamano_por_fetch: the size this reader declares, if smaller than the image (fetch dword 2).
+        if (REXCVAR_GET(xdroid360_tamano_por_fetch)) {
+          const uint32_t ancho_fetch = (f[2] & 0x1FFF) + 1, alto_fetch = ((f[2] >> 13) & 0x1FFF) + 1;
+          if ((ancho_fetch < resuelta->ancho && alto_fetch <= resuelta->alto) ||
+              (alto_fetch < resuelta->alto && ancho_fetch <= resuelta->ancho)) {
+            contexto_->TamanoMuestreado(base & 0x1FFFFFFF, ancho_fetch, alto_fetch);
+          }
+        }
         // One trace per size, to check in the log that the 1/size constant of resolved textures is no longer
         // 0 (that was the cause of the shadow flicker).
         if (avisos_invtam_resuelta_.insert(uint64_t(resuelta->ancho) << 32 | resuelta->alto).second) {

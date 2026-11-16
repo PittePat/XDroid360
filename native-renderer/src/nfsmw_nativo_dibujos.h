@@ -43,6 +43,13 @@ inline VkFormat FormatoHostDestinoColor(uint32_t formato) {
       return VK_FORMAT_R16G16B16A16_SFLOAT;
     case 6:   // k_16_16_FLOAT
       return VK_FORMAT_R16G16_SFLOAT;
+    case 4:   // k_16_16
+      // XDroid360: Mass Effect's motion blur velocity buffer. Its draws were refused (cause 204), so the motion
+      // blur read whatever the image held and smeared every moving thing into a ghost. On the Xenos k_16_16 is
+      // fixed point -32..32 and its resolve converts back to the value; for what the game writes there (0..1,
+      // 0.5 = no motion, ONE/ZERO) a UNORM16 target copied as is gives the same numbers (masseffect-nx,
+      // image-defects-feros.md 3.6).
+      return VK_FORMAT_R16G16_UNORM;
     case 14:  // k_32_FLOAT
       return VK_FORMAT_R32_SFLOAT;
     case 15:  // k_32_32_FLOAT
@@ -125,6 +132,10 @@ class ContextoDestinos {
   virtual ImagenNativa* DestinoProfundidad(uint32_t base, uint32_t formato, uint32_t pitch) = 0;
   // Texture resolved by C2 at that physical address, or nullptr.
   virtual const ImagenNativa* TexturaResuelta(uint32_t direccion) = 0;
+  // xdroid360_tamano_por_fetch: a reader's fetch constant declares that resolved texture smaller than its image.
+  virtual void TamanoMuestreado(uint32_t direccion, uint32_t ancho, uint32_t alto) {
+    (void)direccion, (void)ancho, (void)alto;
+  }
   // nfsmw_nativo_profundidad_perezosa. While set, the depth textures requested belong to a sample the
   // shader does not take (the final composite without blur) and do not force a copy.
   virtual void LecturasDeProfundidadMuertas(bool muertas) { (void)muertas; }

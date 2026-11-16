@@ -151,6 +151,20 @@ REXCVAR_DEFINE_BOOL(xdroid360_alias_edram, false, "NFSMW",
                     "not the one last drawn at that base and pitch reads (and clears) the image last drawn "
                     "there, converted by the copy's blit; and D3D's Clear rectangles clear every color image "
                     "at the base and pitch. false = as before");
+REXCVAR_DEFINE_BOOL(xdroid360_tamano_por_fetch, false, "NFSMW",
+                    "XDroid360: a resolved texture takes the size its readers' fetch constant gives it (learned "
+                    "from the first frame that samples it), when that is smaller than the copy. Its UVs 0..1 span "
+                    "that size. Mass Effect copies 328x184 of its quarter-size DOF/bloom image and samples a "
+                    "smaller texture (320x180 plus a border); 328 wide, the blurred copy was stretched over the "
+                    "scene and near objects in cinematics got a shifted ghost (masseffect-nx crops the same way)");
+REXCVAR_DEFINE_BOOL(xdroid360_sesgo_copias, false, "NFSMW",
+                    "XDroid360, with xdroid360_alias_edram: apply a resolve's exponent bias (RB_COPY_DEST_INFO "
+                    "16-21) on the copies from a float render target (2_10_10_10_FLOAT or 16_16_16_16_FLOAT) "
+                    "to a 16_16_16_16_FLOAT texture, as the console's resolve does: Mass Effect resolves its "
+                    "HDR scene with -3 (times 1/8) and reads it back as is, and without it the scene was "
+                    "blown out. Off by default: State of Decay's HDR copies carry a bias that its texture "
+                    "fetches take back, and this path applies neither (the game's own native host turns it "
+                    "on)");
 REXCVAR_DEFINE_BOOL(xdroid360_recarga_edram, true, "NFSMW",
                     "XDroid360: the EDRAM reload idiom (Dragon Age: Origins' xenonreload after predicated "
                     "tiling) done as image copies: a rectangle-list draw whose second color target sits at "
@@ -1564,6 +1578,8 @@ class DestinosVulkan final : public DestinosNativos, public ContextoDestinos {
     // cannot hold more than 31.875, ours can (water glints of several thousand), and the bloom built from
     // the copy washed the whole frame out. The copy goes through the same pass, which only clamps.
     bool limitar_7e3 = false;
+    // The copy's exponent bias as a factor (xdroid360_sesgo_copias), applied by the limit pass; 1 = none.
+    float escala_copia = 1.0f;
     if (copiar) {
       const uint32_t info_destino = reg.rb_copy_dest_info;
       const uint32_t formato_destino = (info_destino >> 7) & 0x3F;
@@ -1606,6 +1622,9 @@ class DestinosVulkan final : public DestinosNativos, public ContextoDestinos {
         case 31:  // k_16_16_FLOAT
           formato_copia = VK_FORMAT_R16G16_SFLOAT;
           break;
+        case 25:  // k_16_16: Mass Effect's velocity buffer, from its k_16_16 target (R16G16_UNORM: copied as is)
+          formato_copia = VK_FORMAT_R16G16_UNORM;
+          break;
         case 26:  // k_16_16_16_16
           // From a float target (State of Decay's HDR scene, with a copy exponent bias the texture's fetch
           // takes back) the texture stays half float: a normalized one clamped at 1.0 what the console
@@ -1630,6 +1649,10 @@ class DestinosVulkan final : public DestinosNativos, public ContextoDestinos {
                     formato_copia == VK_FORMAT_R16G16B16A16_SFLOAT &&
                     destino_render->formato == VK_FORMAT_R16G16B16A16_SFLOAT &&
                     (alias_7e3 || formato_color == 3 || formato_color == 12);
+      if (limitar_7e3 && formato_destino == 32 && REXCVAR_GET(xdroid360_sesgo_copias)) {
+        const int32_t sesgo_copia = int32_t(info_destino << 10) >> 26;  // RB_COPY_DEST_INFO 16-21, signed
+        escala_copia = std::ldexp(1.0f, sesgo_copia);
+      }
       if ((info_destino >> 3) & 0x1) {
         Rechazar(3, "copia a textura 3D o array: todavia no");
       } else if (formato_copia == VK_FORMAT_UNDEFINED) {
@@ -1659,6 +1682,15 @@ class DestinosVulkan final : public DestinosNativos, public ContextoDestinos {
         uint32_t ancho_resuelta = ancho_imagen, alto_resuelta = alto_destino;
         if (log2_bytes_copia == 2) {  // UnirTesela counts 4 bytes per texel
           UnirTesela(base, pitch_destino, formato_copia, dy, ancho_resuelta, alto_resuelta);
+        }
+        // xdroid360_tamano_por_fetch: the size the readers declare, if smaller (the copy is clipped to it).
+        if (REXCVAR_GET(xdroid360_tamano_por_fetch) && dx == 0 && dy == 0) {
+          const auto t = tamano_fetch_.find(base & 0x1FFFFFFF);
+          if (t != tamano_fetch_.end() && uint32_t(t->second) <= ancho_resuelta &&
+              uint32_t(t->second >> 32) <= alto_resuelta) {
+            ancho_resuelta = uint32_t(t->second);
+            alto_resuelta = uint32_t(t->second >> 32);
+          }
         }
         resuelta = ObtenerResuelta(base & 0x1FFFFFFF, ancho_resuelta, alto_resuelta, formato_destino,
                                    (info_destino >> 24) & 0x1, formato_copia);
@@ -1781,7 +1813,7 @@ class DestinosVulkan final : public DestinosNativos, public ContextoDestinos {
                                 dx == 0 && dy == 0 && ancho == resuelta->imagen.ancho && alto == resuelta->imagen.alto);
         if ((codificar_7e3 || limitar_7e3) && resuelta->imagen.formato == VK_FORMAT_R16G16B16A16_SFLOAT &&
             Codificar7e3(*destino_render, resuelta->imagen, x0, y0, dx, dy, ancho, alto, base_resuelta,
-                         limitar_7e3)) {
+                         limitar_7e3, escala_copia)) {
           // The 7e3 codes, written by a pass instead of the blit or the copy below (which stay as the
           // fallback if the pass could not be created or recorded).
           ++copias_;
@@ -1974,7 +2006,7 @@ class DestinosVulkan final : public DestinosNativos, public ContextoDestinos {
       VkPushConstantRange rango{};
       rango.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
       rango.offset = 0;
-      rango.size = 4 * sizeof(int32_t);  // ivec2 desplazamiento, int modo, padding
+      rango.size = 4 * sizeof(int32_t);  // ivec2 desplazamiento, int modo, float escala
       VkPipelineLayoutCreateInfo info_pipeline_layout{};
       info_pipeline_layout.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
       info_pipeline_layout.setLayoutCount = 1;
@@ -2104,7 +2136,8 @@ class DestinosVulkan final : public DestinosNativos, public ContextoDestinos {
   // (xdroid360_codificar_7e3.frag). Both images in GENERAL, both half floats. false if it could not: nothing
   // was recorded and the caller copies as always.
   bool Codificar7e3(const Imagen& origen, const Imagen& destino, int32_t x0, int32_t y0, uint32_t dx,
-                    uint32_t dy, uint32_t ancho, uint32_t alto, uint32_t base, bool solo_limitar = false) {
+                    uint32_t dy, uint32_t ancho, uint32_t alto, uint32_t base, bool solo_limitar = false,
+                    float escala = 1.0f) {
     if (origen.vista == VK_NULL_HANDLE || destino.vista == VK_NULL_HANDLE || origen.imagen == destino.imagen ||
         x0 < 0 || y0 < 0 || !PrepararCodificar7e3()) {
       return false;
@@ -2206,8 +2239,11 @@ class DestinosVulkan final : public DestinosNativos, public ContextoDestinos {
     dfn_.vkCmdBindPipeline(comandos, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_7e3_);
     dfn_.vkCmdBindDescriptorSets(comandos, VK_PIPELINE_BIND_POINT_GRAPHICS, layout_pipeline_7e3_, 0, 1,
                                  &descriptores, 0, nullptr);
-    // Source texel - destination pixel, and the mode: 0 = the 7e3 codes, 1 = the values clamped to 31.875.
-    const int32_t desplazamiento[4] = {x0 - int32_t(dx), y0 - int32_t(dy), solo_limitar ? 1 : 0, 0};
+    // Source texel - destination pixel, the mode (0 = the 7e3 codes, 1 = the values clamped to 31.875) and,
+    // in mode 1, the copy's exponent bias as a factor (the float's bits in the fourth word).
+    int32_t escala_bits = 0;
+    std::memcpy(&escala_bits, &escala, sizeof(escala_bits));
+    const int32_t desplazamiento[4] = {x0 - int32_t(dx), y0 - int32_t(dy), solo_limitar ? 1 : 0, escala_bits};
     dfn_.vkCmdPushConstants(comandos, layout_pipeline_7e3_, VK_SHADER_STAGE_FRAGMENT_BIT, 0,
                             sizeof(desplazamiento), desplazamiento);
     dfn_.vkCmdDraw(comandos, 3, 1, 0, 0);
@@ -3968,6 +4004,19 @@ class DestinosVulkan final : public DestinosNativos, public ContextoDestinos {
     // since then, it has to be brought back.
     RestaurarContenido(*imagen);
     return imagen;
+  }
+
+  void TamanoMuestreado(uint32_t direccion, uint32_t ancho, uint32_t alto) override {
+    const uint64_t valor = uint64_t(ancho) | (uint64_t(alto) << 32);
+    auto [it, nueva] = tamano_fetch_.try_emplace(direccion, valor);
+    if (nueva || it->second != valor) {
+      it->second = valor;
+      const auto r = resueltas_.find(direccion);
+      REXLOG_INFO("[nativo] C2: textura resuelta {:08X}: el juego la lee {}x{}, la copia es {}x{}; desde la "
+                  "siguiente copia tendra {}x{} (xdroid360_tamano_por_fetch)",
+                  direccion, ancho, alto, r != resueltas_.end() ? r->second.imagen.ancho : 0,
+                  r != resueltas_.end() ? r->second.imagen.alto : 0, ancho, alto);
+    }
   }
 
   const ImagenNativa* TexturaResuelta(uint32_t direccion) override {
@@ -7245,6 +7294,8 @@ class DestinosVulkan final : public DestinosNativos, public ContextoDestinos {
   // xdroid360_alias_edram: by EDRAM base and pitch, the key in destinos_ of the image last bound for drawing.
   std::unordered_map<uint64_t, uint64_t> ultimo_dibujado_;
   std::unordered_map<uint32_t, Resuelta> resueltas_;
+  // xdroid360_tamano_por_fetch: address -> width | height << 32 that its readers declare.
+  std::unordered_map<uint32_t, uint64_t> tamano_fetch_;
   // XDroid360: UnirTesela.
   std::unordered_set<uint32_t> avisos_teselas_;
   uint64_t copias_a_tesela_ = 0;
