@@ -497,6 +497,12 @@ public class GameActivity extends SDLActivity {
             if (current.hasNativeRenderer()) {
                 XeniaConfig.set(config, "dao_gpu_renderer", "\"" + current.rendererToUse() + "\"");
             }
+            // Mass Effect takes a missing intro movie for a failed disc read and quits at once
+            // (XamShowDirtyDiscErrorUI), so the runtime's skip_intro_logos patch, on by default on
+            // Android, must stay off for it.
+            if (Instance.ME1_TITLE_ID.equals(current.titleId())) {
+                XeniaConfig.set(config, "patches", "skip_intro_logos", "false");
+            }
             org.json.JSONObject frameRate = current.option("frame_rate");
             String[] key = frameRate != null ? frameRate.optString("config").split("\\.", 2) : new String[0];
             if (key.length == 2 && current.frameRateToUse() > 0) {

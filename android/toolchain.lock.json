@@ -10,9 +10,9 @@
     },
     {
       "repo": "udarmolota/ME1Recomp",
-      "tag": "profile-me1-2",
-      "asset": "xdroid360-profile-me1-2.zip",
-      "sha256": "2514dc71684ac60fbefa8a4e5d2fc07fe538ae5cfdddf1839054f138af22a3e1",
+      "tag": "profile-me1-3",
+      "asset": "xdroid360-profile-me1-3.zip",
+      "sha256": "d4eb74d4820497727486941c4029857e2f09f521d9d6a8afa5e81ffe41256257",
       "as": "games/me1.zip"
     }
   ]
