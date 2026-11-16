@@ -325,9 +325,13 @@ public class LauncherActivity extends AppCompatActivity {
                         }
                     }), cancelled);
             ui.post(() -> {
+                // Android may have recreated this activity while the files were copied (low memory):
+                // its window, and the progress dialog's, are gone, and dismissing it would crash.
+                // The install itself has finished; the new activity shows the game as it now is.
+                if (isFinishing() || isDestroyed()) return;
                 getWindow().clearFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
                 dialog.dismiss();
-                if (isFinishing() || cancelled.get()) return;
+                if (cancelled.get()) return;
                 com.google.android.material.dialog.MaterialAlertDialogBuilder done =
                         new com.google.android.material.dialog.MaterialAlertDialogBuilder(this)
                                 .setTitle(R.string.dlc_done)
