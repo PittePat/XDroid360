@@ -110,6 +110,7 @@
     <string name="tab_projects">Projects</string>
     <string name="transfer_no_game">Add a game first: import and export work on a game\'s saves and its gamepad layout.</string>
     <string name="transfer_game">Game</string>
+    <string name="transfer_game_pick">Choose a game</string>
     <string name="transfer_saves">Saves</string>
     <string name="transfer_saves_import_hint">A .zip of saves: from another phone, another game card, or Dragon Age: Origins Recompiled on a PC. Saves with the same name are replaced.</string>
     <string name="transfer_saves_export_hint">All this game\'s saves into one .zip, to keep or to move to another phone.</string>

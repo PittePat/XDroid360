@@ -222,28 +222,41 @@ public class LauncherActivity extends AppCompatActivity {
             findViewById(R.id.transfer_dlc_card).setVisibility(View.GONE);
             return;
         }
-        // The game picked before (refresh() makes new Instance objects: matched by id).
-        Instance again = instances.get(0);
+        // Which game: a drop-down list. With one game it is chosen; with several none is until the
+        // player picks one (a first "Choose a game" row), so nothing goes to a game by default. The
+        // game picked before stays picked (refresh() makes new Instance objects: matched by id).
+        Instance again = instances.size() == 1 ? instances.get(0) : null;
         for (Instance i : instances) if (transferFor != null && i.id.equals(transferFor.id)) again = i;
         transferFor = again;
-        android.widget.RadioGroup group = findViewById(R.id.transfer_game);
-        group.setOnCheckedChangeListener(null);
-        group.removeAllViews();
-        for (Instance i : instances) {
-            com.google.android.material.radiobutton.MaterialRadioButton b =
-                    new com.google.android.material.radiobutton.MaterialRadioButton(this);
-            b.setId(View.generateViewId());
-            b.setText(i.name);
-            b.setTag(i);
-            group.addView(b);
-            if (i == transferFor) group.check(b.getId());
-        }
-        group.setOnCheckedChangeListener((g, checked) -> {
-            transferFor = (Instance) g.findViewById(checked).getTag();
-            showDlcCard();
+        boolean placeholder = instances.size() > 1;
+        java.util.List<String> names = new java.util.ArrayList<>();
+        if (placeholder) names.add(getString(R.string.transfer_game_pick));
+        for (Instance i : instances) names.add(i.name);
+        android.widget.Spinner spinner = findViewById(R.id.transfer_game);
+        android.widget.ArrayAdapter<String> adapter =
+                new android.widget.ArrayAdapter<>(this, android.R.layout.simple_spinner_item, names);
+        adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+        spinner.setOnItemSelectedListener(null);
+        spinner.setAdapter(adapter);
+        int at = transferFor != null ? instances.indexOf(transferFor) + (placeholder ? 1 : 0) : 0;
+        spinner.setSelection(at, false);
+        spinner.setOnItemSelectedListener(new android.widget.AdapterView.OnItemSelectedListener() {
+            @Override
+            public void onItemSelected(android.widget.AdapterView<?> parent, View view, int position, long id) {
+                int index = position - (placeholder ? 1 : 0);
+                transferFor = index >= 0 && index < instances.size() ? instances.get(index) : null;
+                showTransferTargets();
+            }
+
+            @Override
+            public void onNothingSelected(android.widget.AdapterView<?> parent) {
+                transferFor = null;
+                showTransferTargets();
+            }
         });
-        showDlcCard();
+        showTransferTargets();
         findViewById(R.id.transfer_dlc).setOnClickListener(v -> {
+            if (transferFor == null) return; // no game picked yet
             dlcForId = transferFor.id;
             pickDlc.launch(new String[] { "*/*" });
         });
@@ -256,10 +269,12 @@ public class LauncherActivity extends AppCompatActivity {
         ((TextView) findViewById(R.id.transfer_saves)).setText(button);
         ((TextView) findViewById(R.id.transfer_pad)).setText(button);
         findViewById(R.id.transfer_saves).setOnClickListener(v -> {
+            if (transferFor == null) return; // no game picked yet
             if (transferExport) exportSavesOf(transferFor);
             else pick(transferFor, PICK_SAVES);
         });
         findViewById(R.id.transfer_pad).setOnClickListener(v -> {
+            if (transferFor == null) return; // no game picked yet
             if (transferExport) {
                 exportForId = transferFor.id;
                 exportPad.launch(padFileName(transferFor));
@@ -286,6 +301,15 @@ public class LauncherActivity extends AppCompatActivity {
             found = i;
         }
         return found;
+    }
+
+    /** What depends on the game picked: the buttons work only once one is, and the DLC card. */
+    private void showTransferTargets() {
+        boolean picked = transferFor != null;
+        for (int button : new int[] { R.id.transfer_saves, R.id.transfer_pad }) {
+            findViewById(button).setEnabled(picked);
+        }
+        showDlcCard();
     }
 
     /** The DLC card: on Import, for Dragon Age: Origins (the one game with DLC to add). */

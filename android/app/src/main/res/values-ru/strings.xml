@@ -106,6 +106,7 @@
     <string name="tab_projects">Проекты</string>
     <string name="transfer_no_game">Сначала добавьте игру: импорт и экспорт работают с её сохранениями и раскладкой джойстика.</string>
     <string name="transfer_game">Игра</string>
+    <string name="transfer_game_pick">Выберите игру</string>
     <string name="transfer_saves">Сохранения</string>
     <string name="transfer_saves_import_hint">.zip с сохранениями: с другого телефона, из другой карточки игры или из Dragon Age: Origins Recompiled на ПК. Сохранения с тем же именем заменяются.</string>
     <string name="transfer_saves_export_hint">Все сохранения этой игры в один .zip, чтобы сохранить копию или перенести на другой телефон.</string>

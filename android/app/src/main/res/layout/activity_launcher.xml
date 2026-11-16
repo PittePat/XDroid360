@@ -127,10 +127,10 @@
                             android:layout_height="wrap_content"
                             android:text="@string/transfer_game" />
 
-                        <RadioGroup
+                        <Spinner
                             android:id="@+id/transfer_game"
                             android:layout_width="match_parent"
-                            android:layout_height="wrap_content" />
+                            android:layout_height="48dp" />
                     </LinearLayout>
                 </com.google.android.material.card.MaterialCardView>
 
