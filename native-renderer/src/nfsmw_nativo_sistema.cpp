@@ -4718,10 +4718,11 @@ class SistemaGraficoNativo final : public rex::system::IGraphicsSystem {
         contadores_previos_ = contadores;
       }
       NFSMW_INFORME_SEGUN(diferir_informe, "[nativo] C6: dibujados={} rechazados={} pipelines={} ({} ms creando) "
-                  "texturas={} ({} MB) subidas de textura={} MB subidos={}; rechazos por "
-                  "causa:{}",
+                  "texturas={} ({} MB; ranuras 2D {} de {}, sin ranura {}) subidas de textura={} MB subidos={}; "
+                  "rechazos por causa:{}",
                   d.dibujados, d.rechazados, d.pipelines, d.ms_pipelines, d.texturas,
-                  d.megas_texturas, d.subidas_textura, d.megas_subidos, causas);
+                  d.megas_texturas, d.ranuras_2d, d.capacidad_2d, d.texturas_sin_ranura, d.subidas_textura,
+                  d.megas_subidos, causas);
     }
     if (shaders_.cargada()) {
       const EstadisticasShaders e = shaders_.Estadisticas();

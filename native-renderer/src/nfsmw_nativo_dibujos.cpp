@@ -1202,6 +1202,15 @@ constexpr uint32_t kRegBooleanos = 0x4900;
 constexpr uint32_t kRegistrosConstantes = 0x400;  // 256 constantes x 4
 
 constexpr uint32_t kCapacidadMonton[4] = {4096, 16, 64, 512};  // 2D, 3D, cubo, samplers
+// The 2D heap is sized from the device in CrearDescriptores (capacidad_montones_[0]): kCapacidadMonton[0]
+// is the floor (the size every device ran with before, so a device or driver reporting less still gets
+// what worked; do not "fix" the clamp below it), this the ceiling. State of Decay keeps well over 4096 small textures alive outdoors (5000+
+// at ~260 MB, far below the MB eviction limit), and once the heap was full every new texture sampled the
+// empty one: characters and objects vanished after a few minutes outdoors. If the shaders ever get a
+// fixed-size array (Mali Bifrost, no runtimeDescriptorArray), it must use capacidad_montones_[0].
+constexpr uint32_t kCapacidadMonton2dMaxima = 16384;
+// Free 2D slots below this fraction (in tenths) start the cold-texture eviction as well, not only the MB limit.
+constexpr uint32_t kDecimasMontonParaSoltar = 9;
 // Work slots. The ones actually used are chosen by nfsmw_nativo_ranuras_trabajo; this is the room reserved
 // for them, and it has to match the array in nfsmw_nativo_destinos.cpp.
 constexpr size_t kRanurasDeTrabajo = 3;
@@ -5365,12 +5374,32 @@ class DibujosVulkanImpl final : public DibujosVulkan {
   static constexpr uint32_t kSoltarPorFotograma = 4;
 
   void ExpulsarTexturasSiHaceFalta() {
+    // The heaps run out before the memory when a game keeps many small textures (State of Decay outdoors):
+    // the same gradual eviction of cold textures, from 90 % of the 2D or cube heap. Their slots return
+    // in SoltarImagenes.
+    bool montones_llenos = false;
+    for (uint32_t m : {0u, 2u}) {
+      const Monton& monton = montones_[m];
+      if (monton.capacidad && uint64_t(monton.Ocupadas()) * 10 >= uint64_t(monton.capacidad) * kDecimasMontonParaSoltar) {
+        montones_llenos = true;
+      }
+    }
+    if (montones_llenos) {
+      SoltarUnasPocasFrias();
+      if (fotograma_ >= aviso_montones_ + 600) {  // one line every 600 frames
+        aviso_montones_ = fotograma_;
+        REXLOG_INFO("[nativo] C3: monton de texturas casi lleno ({} de {} ranuras 2D, {} de {} de cubos): se sueltan "
+                    "frias a goteo; {} texturas sin ranura desde el arranque",
+                    montones_[0].Ocupadas(), montones_[0].capacidad, montones_[2].Ocupadas(), montones_[2].capacidad,
+                    texturas_sin_ranura_);
+      }
+    }
     const uint64_t limite = uint64_t(std::max(texturas_mb_max_, 0)) << 20;
     if (!limite) {
       return;
     }
     // Little by little, from 75 % of the limit. That is what avoids the stutter.
-    if (bytes_texturas_ > limite / 4 * 3) {
+    if (!montones_llenos && bytes_texturas_ > limite / 4 * 3) {
       SoltarUnasPocasFrias();
     }
     // Safety net: if it still goes over the limit (because almost everything is hot), one batch every 60
@@ -5679,6 +5708,9 @@ class DibujosVulkanImpl final : public DibujosVulkan {
     e.subidas_textura = subidas_textura_;
     e.megas_subidos = megas_bytes_ >> 20;
     e.megas_texturas = bytes_texturas_ >> 20;
+    e.ranuras_2d = montones_[0].Ocupadas();
+    e.capacidad_2d = montones_[0].capacidad;
+    e.texturas_sin_ranura = texturas_sin_ranura_;
     e.ms_pipelines = ns_pipelines_ / 1000000;
     e.pases = pases_empezados_;
     e.envios_llenos = envios_llenos_;
@@ -6015,6 +6047,7 @@ class DibujosVulkanImpl final : public DibujosVulkan {
     vista.monton = monton;
     vista.ranura = ReservarRanura(monton);
     if (!vista.ranura) {
+      ++texturas_sin_ranura_;
       Avisar(35, "monton de texturas lleno");
       return 0;
     }
@@ -8162,6 +8195,42 @@ class DibujosVulkanImpl final : public DibujosVulkan {
                 informe.empty() ? std::string("sin tipos medibles") : informe);
   }
 
+  // Slots of the 2D texture heap: as many as the device allows for update-after-bind sampled images, between
+  // kCapacidadMonton[0] and kCapacidadMonton2dMaxima. The per-stage limit binds: VS and FS each see the 2D,
+  // 3D and cube heaps, so those two are subtracted; the stage's total resources also count the samplers and
+  // the UBOs (a margin of 32), and the pool holds all three image heaps.
+  uint32_t CapacidadMonton2d() const {
+    const uint32_t minima = kCapacidadMonton[0];
+    const auto& fi = dispositivo_->vulkan_instance()->functions();
+    if (!fi.vkGetPhysicalDeviceProperties2) {
+      REXLOG_INFO("[compatibilidad] monton de texturas 2D: {} ranuras (sin vkGetPhysicalDeviceProperties2)", minima);
+      return minima;
+    }
+    VkPhysicalDeviceDescriptorIndexingProperties indexado{};
+    indexado.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DESCRIPTOR_INDEXING_PROPERTIES;
+    VkPhysicalDeviceProperties2 propiedades2{};
+    propiedades2.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PROPERTIES_2;
+    propiedades2.pNext = &indexado;
+    fi.vkGetPhysicalDeviceProperties2(dispositivo_->physical_device(), &propiedades2);
+    const uint64_t otras_imagenes = uint64_t(kCapacidadMonton[1]) + kCapacidadMonton[2];
+    const uint64_t margen_recursos = otras_imagenes + kCapacidadMonton[3] + 32;
+    const auto resta = [](uint64_t limite, uint64_t otros) { return limite > otros ? limite - otros : 0; };
+    uint64_t limite = std::min<uint64_t>(indexado.maxPerStageDescriptorUpdateAfterBindSampledImages,
+                                         indexado.maxDescriptorSetUpdateAfterBindSampledImages);
+    limite = resta(limite, otras_imagenes);
+    limite = std::min(limite, resta(indexado.maxPerStageUpdateAfterBindResources, margen_recursos));
+    limite = std::min(limite, resta(indexado.maxUpdateAfterBindDescriptorsInAllPools,
+                                    otras_imagenes + kCapacidadMonton[3]));
+    const uint32_t capacidad =
+        uint32_t(std::clamp<uint64_t>(limite, minima, kCapacidadMonton2dMaxima));
+    REXLOG_INFO("[compatibilidad] monton de texturas 2D: {} ranuras (limites del dispositivo: por etapa {}, por "
+                "conjunto {}, recursos por etapa {}, en todos los pools {})",
+                capacidad, indexado.maxPerStageDescriptorUpdateAfterBindSampledImages,
+                indexado.maxDescriptorSetUpdateAfterBindSampledImages, indexado.maxPerStageUpdateAfterBindResources,
+                indexado.maxUpdateAfterBindDescriptorsInAllPools);
+    return capacidad;
+  }
+
   bool CrearDescriptores() {
     static constexpr VkDescriptorType kTipos[4] = {
         VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE,
@@ -8190,7 +8259,11 @@ class DibujosVulkanImpl final : public DibujosVulkan {
       }
     }
     for (uint32_t i = 0; i < 4; ++i) {
-      montones_[i].capacidad = kCapacidadMonton[i];
+      capacidad_montones_[i] = kCapacidadMonton[i];
+    }
+    capacidad_montones_[0] = CapacidadMonton2d();
+    for (uint32_t i = 0; i < 4; ++i) {
+      montones_[i].capacidad = capacidad_montones_[i];
       if (cuatro_conjuntos_ && i == 2) {
         continue;  // el de cubos va en el conjunto 1
       }
@@ -8198,12 +8271,12 @@ class DibujosVulkanImpl final : public DibujosVulkan {
       VkDescriptorSetLayoutBinding enlaces[2]{};
       enlaces[0].binding = 0;
       enlaces[0].descriptorType = kTipos[i];
-      enlaces[0].descriptorCount = kCapacidadMonton[i];
+      enlaces[0].descriptorCount = capacidad_montones_[i];
       enlaces[0].stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT;
       enlaces[1] = enlaces[0];
       enlaces[1].binding = 1;
       enlaces[1].descriptorType = kTipos[2];
-      enlaces[1].descriptorCount = kCapacidadMonton[2];
+      enlaces[1].descriptorCount = capacidad_montones_[2];
       const VkDescriptorBindingFlags banderas_enlaces[2] = {banderas_enlace, banderas_enlace};
       VkDescriptorSetLayoutBindingFlagsCreateInfo banderas{};
       banderas.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_BINDING_FLAGS_CREATE_INFO;
@@ -8221,8 +8294,8 @@ class DibujosVulkanImpl final : public DibujosVulkan {
     }
     const VkDescriptorPoolSize tamanos[2] = {
         {VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE,
-         kCapacidadMonton[0] + kCapacidadMonton[1] + kCapacidadMonton[2]},
-        {VK_DESCRIPTOR_TYPE_SAMPLER, kCapacidadMonton[3]}};
+         capacidad_montones_[0] + capacidad_montones_[1] + capacidad_montones_[2]},
+        {VK_DESCRIPTOR_TYPE_SAMPLER, capacidad_montones_[3]}};
     VkDescriptorPoolCreateInfo info_pool{};
     info_pool.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
     info_pool.flags = VK_DESCRIPTOR_POOL_CREATE_UPDATE_AFTER_BIND_BIT;
@@ -10238,6 +10311,7 @@ class DibujosVulkanImpl final : public DibujosVulkan {
     vista.ranura = ReservarRanura(monton);
     if (!vista.ranura) {
       dfn_.vkDestroyImageView(device_, vista.vista, nullptr);
+      ++texturas_sin_ranura_;
       Avisar(35, "monton de texturas lleno");
       return 0;
     }
@@ -12585,6 +12659,8 @@ class DibujosVulkanImpl final : public DibujosVulkan {
     uint32_t capacidad = 0;
     uint32_t siguiente = 1;
     std::vector<uint32_t> libres;
+    // Slots holding a view now (slot 0 is the empty texture and never handed out).
+    uint32_t Ocupadas() const { return siguiente - 1 - uint32_t(libres.size()); }
   };
 
   const VulkanDevice* dispositivo_;
@@ -12750,6 +12826,11 @@ class DibujosVulkanImpl final : public DibujosVulkan {
   uint64_t envios_ubo_ = 0;
   std::chrono::steady_clock::time_point inicio_ubo_ = std::chrono::steady_clock::now();
   std::array<Monton, 4> montones_{};
+  // Each heap's size, chosen once in CrearDescriptores (the 2D one from the device): the single source for
+  // the slots, the layout bindings and the pool.
+  std::array<uint32_t, 4> capacidad_montones_{};
+  uint64_t texturas_sin_ranura_ = 0;  // views refused because their heap was full (cause 35), since start
+  uint64_t aviso_montones_ = 0;       // frame of the last "heap nearly full" eviction log
   std::array<ImagenNativa, 3> vacias_{};
   VkSampler sampler_vacio_ = VK_NULL_HANDLE;
   bool vacias_preparadas_ = false;

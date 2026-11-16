@@ -239,6 +239,9 @@ struct EstadisticasDibujos {
   uint64_t subidas_textura = 0;
   uint64_t megas_subidos = 0;  // vertices, indices, constants and textures
   uint64_t megas_texturas = 0;  // texture images created (base level, no eviction)
+  uint64_t ranuras_2d = 0;           // the 2D texture heap: slots in use
+  uint64_t capacidad_2d = 0;         // and its size (from the device)
+  uint64_t texturas_sin_ranura = 0;  // views refused with a full heap since start (drawn with the empty one)
   uint64_t ms_pipelines = 0;  // creando pipelines, acumulado
   // Accumulated for "C6 contadores" (the system prints the differences per report).
   uint64_t pases = 0;             // render passes empezados
