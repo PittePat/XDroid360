@@ -84,6 +84,60 @@ bool NombreEs(const Contenedor& c, size_t posicion, const char* nombre) {
 // read.
 void FiltrosDeInstrucciones(EntradaShader& e);  // XDroid360, below
 
+// XDroid360 (Mass Effect, after masseffect-nx): a shader with no constant table or an empty one (Direct3D's and
+// Scaleform's own), linked by register as XenosRecomp translates it (linkByRegister). D3D never patches these,
+// so the microcode stays as the container has it (no fetch words are cleared). Called by Leer with the
+// microcode already read.
+const char* LeerPorRegistro(const Contenedor& c, size_t inicio_microcodigo, EntradaShader& e) {
+  for (size_t i = 0; i < e.microcodigo.size(); ++i) {
+    e.microcodigo[i] = c.U32(inicio_microcodigo + i * 4);  // undo the clearing Leer did for the table's elements
+  }
+  e.elementos.clear();
+  if (e.vertices) {
+    // The full vertex fetches, by destination register (XenosRecomp VertexFetchesByRegister: the same walk).
+    const std::vector<uint32_t>& w = e.microcodigo;
+    size_t fin = w.size() / 3;
+    for (size_t par = 0; par < fin && par * 3 + 2 < w.size(); ++par) {
+      const uint64_t cf[2] = {uint64_t(w[par * 3]) | (uint64_t(w[par * 3 + 1] & 0xFFFF) << 32),
+                              uint64_t(w[par * 3 + 1] >> 16) | (uint64_t(w[par * 3 + 2]) << 16)};
+      for (uint64_t ins : cf) {
+        const uint32_t opcode = uint32_t(ins >> 44) & 0xF;
+        if (!((opcode >= 1 && opcode <= 6) || opcode == 13 || opcode == 14)) continue;
+        const uint32_t direccion = uint32_t(ins) & 0xFFF, cuenta = uint32_t(ins >> 12) & 0x7;
+        const uint32_t secuencia = uint32_t(ins >> 16) & 0xFFF;
+        if (direccion) fin = std::min<size_t>(fin, direccion);
+        for (uint32_t i = 0; i < cuenta; ++i) {
+          const size_t k = size_t(direccion) + i;
+          if (!((secuencia >> (i * 2)) & 0x1) || k * 3 + 2 >= w.size() || (w[k * 3] & 0x1F) != 0) continue;
+          const uint32_t registro = (w[k * 3] >> 12) & 0x3F;
+          if (registro >= 8) return "vertice por registro sin ubicacion (>= r8)";
+          ElementoVertice elemento;
+          elemento.instruccion = uint16_t(k);
+          elemento.uso = 5;  // DeclUsage::TexCoord
+          elemento.indice_uso = uint8_t(registro);
+          e.elementos.push_back(elemento);
+        }
+      }
+    }
+  }
+  // Every float register: no table says which the code reads.
+#if defined(NFSC_RECOMP)
+  e.constantes_bytes = 256 * 16;
+#else
+  e.constantes_bytes = (e.vertices ? 256u : 224u) * 16;
+#endif
+  FiltrosDeInstrucciones(e);
+  for (uint32_t k = 0; k < e.filtros_tfetch.size(); ++k) {
+    if (e.filtros_tfetch[k] == 0xFF) continue;  // no texture fetch from this constant
+    SamplerShader sampler;
+    sampler.registro = uint16_t(k);
+    sampler.tipo = 12;  // D3DXPT_SAMPLER2D: their fetches are 2D (UI, fonts, movies)
+    e.samplers.push_back(sampler);
+  }
+  e.huella = XXH3_64bits(e.microcodigo.data(), e.microcodigo.size() * sizeof(uint32_t));
+  return nullptr;
+}
+
 const char* Leer(const nfsmw::native::Shader& shader, EntradaShader& e) {
   const Contenedor c{shader.original};
   if (!c.Hay(0, 24)) return "contenedor demasiado corto";
@@ -148,12 +202,21 @@ const char* Leer(const nfsmw::native::Shader& shader, EntradaShader& e) {
   }
 
   // Constant table: only the samplers (register and type).
-  if (!tabla || !c.Hay(tabla + 4, 28)) return "sin tabla de constantes";
-  const size_t base = size_t(tabla) + 4;
-  const uint32_t constantes = c.U32(base + 12);
-  const uint32_t info = c.U32(base + 16);
-  if (constantes > 1024 || !c.Hay(base + info, size_t(constantes) * 20)) {
+  // XDroid360 (Mass Effect, after masseffect-nx): Direct3D's and Scaleform's own shaders have no table. They
+  // used to be dropped here, so the UI and its text never drew. They are linked by register
+  // (XenosRecomp linkByRegister): the vertex inputs are the fetches' destination registers (TEXCOORD<r>),
+  // the samplers the fetch constants the microcode uses, the float constants every register.
+  const bool sin_tabla = !tabla || !c.Hay(tabla + 4, 28);
+  const size_t base = sin_tabla ? 0 : size_t(tabla) + 4;
+  const uint32_t constantes = sin_tabla ? 0 : c.U32(base + 12);
+  const uint32_t info = sin_tabla ? 0 : c.U32(base + 16);
+  if (!sin_tabla && (constantes > 1024 || !c.Hay(base + info, size_t(constantes) * 20))) {
     return "tabla de constantes fuera del contenedor";
+  }
+  // Only with no table at all, as XenosRecomp decides linkByRegister: an empty table is a game shader without
+  // constants (Dragon Age has them), read as before.
+  if (sin_tabla) {
+    return LeerPorRegistro(c, inicio_microcodigo, e);
   }
   // Float registers the SPIR-V reads: the highest in the table, or up to the end of the
   // buffer if there is an array with relative indexing (XenosRecomp shader_recompiler.cpp:

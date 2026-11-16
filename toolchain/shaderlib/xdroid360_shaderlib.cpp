@@ -9,7 +9,11 @@
 // Containers XenosRecomp or DXC rejects are left out and listed: the renderer skips draws it has
 // no shader for.
 //
-// Usage: libshaderlib.so <shaders.erf> <out.nfsp> [-j N] [--hlsl <dir>]
+// Usage: libshaderlib.so <input> <out.nfsp> [-j N] [--hlsl <dir>]
+//   <input>: Dragon Age's shaders.erf, State of Decay's shaders.pak, or Mass Effect's game folder
+//   (its Unreal packages, *.xxx: ue3_reader.inc, ported by the ME1 session from ue3_shaders.py).
+//   --add <dir> (any number): containers the game built at run time, one file each, as its hook wrote
+//   them on an earlier run (<userdata>/runtime_shaders/*.bin); a missing folder is passed over.
 // stdout, one line each:
 //   containers <n>
 //   progress <done>/<total>              (every 10 shaders, and at the end)
@@ -51,6 +55,7 @@ extern "C" {
 #include <chrono>
 #include <cstdio>
 #include <cstring>
+#include <filesystem>
 #include <fstream>
 #include <mutex>
 #include <set>
@@ -347,6 +352,47 @@ std::vector<Container> ExtractFromPak(const std::vector<uint8_t>& pak) {
   return out;
 }
 
+#include "ue3_reader.inc"  // Mass Effect's Unreal packages: a game folder (ExtractFromUe3Folder)
+
+// --add <dir>: the containers the game built at run time, which no file on the disc holds (Mass Effect's
+// D3D and Scaleform shaders), each one a file of its own as the game's hook wrote it on an earlier run:
+// <userdata>/runtime_shaders/{vs,ps}_<FNV-1a 64>.bin, the 2005 or 2008 container as is. A folder that
+// isn't there yet (no run before) is passed over; a file that isn't one valid container is skipped. Those
+// already in `containers` aren't added twice. Returns how many were added.
+size_t AddContainerFiles(const std::vector<std::string>& dirs, std::vector<Container>& containers) {
+  std::set<std::vector<uint8_t>> seen;
+  for (const Container& c : containers) seen.insert(c.data);
+  size_t added = 0;
+  for (const std::string& dir : dirs) {
+    std::error_code ec;
+    if (!std::filesystem::is_directory(dir, ec)) continue;
+    std::vector<std::filesystem::path> files;
+    for (const auto& e : std::filesystem::directory_iterator(dir, ec)) {
+      if (e.is_regular_file(ec) && e.path().extension() == ".bin") files.push_back(e.path());
+    }
+    std::sort(files.begin(), files.end());
+    for (const auto& path : files) {
+      std::vector<uint8_t> d;
+      try {
+        d = ReadFile(path.string());
+      } catch (const std::exception&) {
+        continue;
+      }
+      if (d.size() < 36) continue;
+      const uint32_t signature = Be32(d, 0), vsize = Be32(d, 4), psize = Be32(d, 8);
+      const uint32_t family = signature & 0xFFFFFF00u;
+      if ((family != 0x102A1100u && family != 0x102A0E00u) || (signature & 0xFF) > 1) continue;
+      if (vsize < 24 || uint64_t(vsize) + psize != d.size()) continue;
+      if (family == 0x102A1100u && !Ue3LayoutOk(d.data(), d.size())) continue;
+      if (!seen.insert(d).second) continue;
+      const bool vertex = signature & 1;
+      containers.push_back({path.stem().string() + (vertex ? ".vs" : ".ps"), std::move(d), vertex});
+      ++added;
+    }
+  }
+  return added;
+}
+
 // Which game's shaders the file holds: Dragon Age's shaders.erf or State of Decay's shaders.pak.
 std::vector<Container> ExtractContainers(const std::vector<uint8_t>& file) {
   if (file.size() >= 0x20 && std::memcmp(file.data(), "ERF V2.1", 8) == 0) return ExtractFromErf(file);
@@ -446,24 +492,27 @@ int main(int argc, char** argv) {
   const auto start = std::chrono::steady_clock::now();
   try {
     std::string erf_path, out_path, hlsl_dir;
+    std::vector<std::string> add_dirs;
     unsigned jobs = std::thread::hardware_concurrency();
     for (int i = 1; i < argc; ++i) {
       const std::string a = argv[i];
       if ((a == "-j" || a == "--jobs") && i + 1 < argc) jobs = static_cast<unsigned>(std::stoul(argv[++i]));
       else if (a == "--hlsl" && i + 1 < argc) hlsl_dir = argv[++i];
+      else if (a == "--add" && i + 1 < argc) add_dirs.push_back(argv[++i]);
       else if (erf_path.empty()) erf_path = a;
       else if (out_path.empty()) out_path = a;
       else throw std::runtime_error("unexpected argument " + a);
     }
     if (erf_path.empty() || out_path.empty()) {
-      std::fprintf(stderr, "usage: %s <shaders.erf> <out.nfsp> [-j N] [--hlsl <dir>]\n", argv[0]);
+      std::fprintf(stderr, "usage: %s <shaders.erf | shaders.pak | Mass Effect game folder> <out.nfsp> [-j N] [--hlsl <dir>] [--add <dir>]...\n", argv[0]);
       return 1;
     }
     if (jobs == 0) jobs = 1;
 
     std::vector<Container> containers;
     try {
-      containers = ExtractContainers(ReadFile(erf_path));
+      containers = std::filesystem::is_directory(erf_path) ? ExtractFromUe3Folder(erf_path)
+                                                           : ExtractContainers(ReadFile(erf_path));
     } catch (const std::invalid_argument& e) {
       std::fprintf(stderr, "%s: %s\n", erf_path.c_str(), e.what());
       return 2;
@@ -472,6 +521,8 @@ int main(int argc, char** argv) {
       std::fprintf(stderr, "%s: no shader containers\n", erf_path.c_str());
       return 2;
     }
+    const size_t added = AddContainerFiles(add_dirs, containers);
+    if (added) std::printf("added %zu\n", added);
     std::printf("containers %zu\n", containers.size());
     std::fflush(stdout);
 

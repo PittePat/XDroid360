@@ -23,8 +23,11 @@
 namespace nfsmw::native {
 namespace {
 constexpr std::array<uint8_t, 8> kFirma{'N','F','S','S','P','V',0,0};
-constexpr size_t kMaxArchivo = 64 * 1024 * 1024;
-constexpr size_t kMaxShaders = 4096;
+// Sanity limits on a library read or written. Mass Effect 1 has about 30,000 shaders (about
+// 10,800 for its menu), far over DAO's and SoD's few hundred: raised for it, until a library
+// can be indexed and loaded on demand.
+constexpr size_t kMaxArchivo = 1024ull * 1024 * 1024;
+constexpr size_t kMaxShaders = 65536;
 constexpr size_t kMaxOriginal = 64 * 1024;
 constexpr size_t kMaxSpirv = 4 * 1024 * 1024;
 

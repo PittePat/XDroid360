@@ -1,7 +1,11 @@
 // XDroid360: changed from nfsmw-android 71b4c8056481fb8652eb0e7433017644e5df54f5,
 // shaders/XenosRecomp/shader_recompiler.h (MIT, hedge-dev and contributors; see ../LICENSE.md):
-// boolean constants the constant table leaves out (booleanMask).
+// boolean constants the constant table leaves out (booleanMask); for Mass Effect, after masseffect-nx's
+// MASSEFFECT fixes: the float registers the definition table sets (literalFloat4).
 #pragma once
+
+#include <functional>
+#include <unordered_set>
 
 #include "shader.h"
 #include "shader_code.h"
@@ -38,6 +42,15 @@ struct ShaderRecompiler : StringBuffer
     // XDroid360: see shader_recompiler.cpp.
     std::string booleanMask(uint32_t boolAddress) const;
     std::unordered_map<uint32_t, const char*> samplers;
+    // XDroid360: the float registers the definition table sets (the local cN), filled before the
+    // instructions are translated.
+    std::unordered_set<uint32_t> literalFloat4;
+    // XDroid360 (after masseffect-nx): Direct3D's own shaders, with no constant table at all, are
+    // never patched by D3D: their vertex inputs are linked by fetch register and their interpolators by
+    // register, as the hardware does.
+    bool linkByRegister = false;
+    // Whether a float definition's values lie outside the microcode (set per shader in recompile).
+    std::function<bool(const Float4Definition&)> validFloatDefinition;
     std::unordered_map<uint32_t, uint32_t> ifEndLabels;
     uint32_t specConstantsMask = 0;
 

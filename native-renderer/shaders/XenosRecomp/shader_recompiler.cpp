@@ -244,6 +244,15 @@ void ShaderRecompiler::recompile(const VertexFetchInstruction& instr, uint32_t a
     out += " = ";
 
     auto findResult = vertexElements.find(address);
+    if (findResult == vertexElements.end() && linkByRegister)
+    {
+        // XDroid360 (after masseffect-nx): a fetch Direct3D's own shader doesn't declare. Nothing binds a
+        // stream for it; the shaders seen only export it to an interpolator no pixel shader reads.
+        out += "0.0;\n";
+        printDstSwizzle01(instr.dstRegister, instr.dstSwizzle);
+        cerrarSiEscribePredicado(marcaPredicado);
+        return;
+    }
     if (findResult == vertexElements.end())
         throw std::runtime_error("FETCH de vertices sin elemento declarado");
 
@@ -577,7 +586,14 @@ void ShaderRecompiler::recompile(const AluInstruction& instr)
                 {
                     if (relativa)
                         throw std::runtime_error("direccionamiento relativo sin constante declarada pendiente");
-                    regFormatted = fmt::format("c{}", reg);
+                    // XDroid360 (Mass Effect, after masseffect-nx): a register the definition table sets is
+                    // the local cN; one no name covers (Direct3D's own shaders, with an empty constant
+                    // table) is read from the constant buffer, like a named one (it was an undeclared cN).
+                    if (literalFloat4.count(reg))
+                        regFormatted = fmt::format("c{}", reg);
+                    else
+                        regFormatted = fmt::format("(NFSMW_UBO ? g_Ubo{0}.v[{1}] : vk::RawBufferLoad<float4>(g_PushConstants.{0}ShaderConstants + {2}, 0x10))",
+                            isPixelShader ? "Pixel" : "Vertex", reg, reg * 16);
                 }
             }
 
@@ -1216,6 +1232,42 @@ void ShaderRecompiler::recompile(const AluInstruction& instr)
     cerrarSiEscribePredicado(marcaPredicado);
 }
 
+// XDroid360 (after masseffect-nx): the full vertex fetches of a microcode (instruction index, destination
+// register), walking the exec clauses of the control flow: Direct3D's own vertex shaders are linked by fetch
+// destination register.
+static std::vector<std::pair<uint32_t, uint32_t>> VertexFetchesByRegister(const std::vector<uint32_t>& w)
+{
+    std::vector<std::pair<uint32_t, uint32_t>> fetches;
+    uint32_t end = uint32_t(w.size() / 3);
+    for (uint32_t pair = 0; pair < end && pair * 3 + 2 < w.size(); pair++)
+    {
+        const uint64_t cf[2] = {
+            uint64_t(w[pair * 3]) | (uint64_t(w[pair * 3 + 1] & 0xFFFF) << 32),
+            uint64_t(w[pair * 3 + 1] >> 16) | (uint64_t(w[pair * 3 + 2]) << 16) };
+        for (uint64_t c : cf)
+        {
+            const uint32_t opcode = uint32_t(c >> 44) & 0xF;
+            const bool exec = (opcode >= 1 && opcode <= 6) || opcode == 13 || opcode == 14;
+            if (!exec)
+                continue;
+            const uint32_t address = uint32_t(c) & 0xFFF, count = uint32_t(c >> 12) & 0x7;
+            const uint32_t sequence = uint32_t(c >> 16) & 0xFFF;
+            if (address != 0)
+                end = std::min(end, address);
+            for (uint32_t i = 0; i < count; i++)
+            {
+                const uint32_t index = address + i;
+                if (!((sequence >> (i * 2)) & 0x1) || index * 3 + 2 >= w.size())
+                    continue;
+                const uint32_t d0 = w[index * 3];
+                if ((d0 & 0x1F) == 0)  // a vertex fetch (opcode 0)
+                    fetches.emplace_back(index, (d0 >> 12) & 0x3F);
+            }
+        }
+    }
+    return fetches;
+}
+
 void ShaderRecompiler::recompile(const uint8_t* shaderData, const std::string_view& include)
 {
     const auto shaderContainer = reinterpret_cast<const ShaderContainer*>(shaderData);
@@ -1225,12 +1277,52 @@ void ShaderRecompiler::recompile(const uint8_t* shaderData, const std::string_vi
      * Both are accepted: only the two high bytes are compared.
      */
     assert((shaderContainer->flags & 0xFFFF0000) == 0x102A0000);
-    assert(shaderContainer->constantTableOffset != NULL);
 
     isPixelShader = (shaderContainer->flags & 0x1) == 0;
 
-    const auto constantTableContainer = reinterpret_cast<const ConstantTableContainer*>(shaderData + shaderContainer->constantTableOffset);
+    // XDroid360 (Mass Effect, after masseffect-nx's MASSEFFECT fix): Direct3D's own shaders have no constant
+    // table, or an empty one. With none, an empty table stands in (the offset 0 read the container's own
+    // header as a table), and both forms are linked by register (linkByRegister).
+    static const ConstantTableContainer kEmptyConstantTable{};
+    const auto constantTableContainer = shaderContainer->constantTableOffset != NULL
+        ? reinterpret_cast<const ConstantTableContainer*>(shaderData + shaderContainer->constantTableOffset)
+        : &kEmptyConstantTable;
+    // Only with no table at all: Dragon Age has game shaders with an empty table (no constants) whose element
+    // and interpolator tables are real and which D3D patches like any other. masseffect-nx also took an empty
+    // table as Direct3D's; here that changed Dragon Age's library.
+    linkByRegister = shaderContainer->constantTableOffset == NULL;
     constantTableData = reinterpret_cast<const uint8_t*>(&constantTableContainer->constantTable);
+
+    // XDroid360 (after masseffect-nx): a float definition whose values would sit inside the microcode is not
+    // a literal (Mass Effect's relocated or immediate shader wrappers keep such a table): the register is
+    // read from the constant buffer instead, as D3D supplies it.
+    const auto codeMetadata = reinterpret_cast<const Shader*>(shaderData + shaderContainer->shaderOffset);
+    // Only for those shaders (linkByRegister): every other shader keeps its definition table as before.
+    validFloatDefinition = [this, shaderContainer, codeMetadata](const Float4Definition& definition) {
+        if (!linkByRegister)
+            return true;
+        const uint64_t begin = definition.physicalOffset;
+        const uint64_t end = begin + ((uint64_t(definition.count) + 3) / 4) * 16;
+        const uint64_t codeBegin = codeMetadata->physicalOffset;
+        const uint64_t codeEnd = codeBegin + uint32_t(codeMetadata->size);
+        return end <= uint32_t(shaderContainer->physicalSize) && (end <= codeBegin || begin >= codeEnd);
+    };
+
+    // XDroid360: the float registers the definition table sets, in the numbering the instructions use
+    // (the declarations of the local cN, written below, use the same).
+    literalFloat4.clear();
+    if (shaderContainer->definitionTableOffset != NULL)
+    {
+        auto definitions = reinterpret_cast<const DefinitionTable*>(shaderData + shaderContainer->definitionTableOffset)->definitions;
+        while (*definitions != 0)
+        {
+            auto definition = reinterpret_cast<const Float4Definition*>(definitions);
+            if (validFloatDefinition(*definition))
+                for (uint16_t i = 0; i < (definition->count + 3) / 4; i++)
+                    literalFloat4.insert(definition->registerIndex + i - (isPixelShader ? 256 : 0));
+            definitions += 2;
+        }
+    }
 
     // XDroid360: how many float constants this pixel shader has (see kAllPixelConstants).
     pixelConstants = kPixelConstants;
@@ -1337,10 +1429,55 @@ void ShaderRecompiler::recompile(const uint8_t* shaderData, const std::string_vi
             }
 
             samplers.emplace(constantInfo->registerIndex, constantName);
+
+            // XDroid360 (Mass Effect, after masseffect-nx's MASSEFFECT fix): a sampler array (UE3's
+            // LightMapTextures, s5..s7) covers registerCount registers and the microcode fetches from
+            // each; only the first had definitions, so the fetches of the others named an undeclared
+            // sN_* and the shader was left out. The others get the sN set a fetch falls back to.
+            for (uint16_t reg = 1; reg < constantInfo->registerCount; reg++)
+            {
+                const uint32_t registerIndex = constantInfo->registerIndex + reg;
+                if (samplers.count(registerIndex))
+                    continue;
+                for (size_t j = 0; j < std::size(TEXTURE_DIMENSIONS); j++)
+                {
+                    println("#define s{}_Texture{}DescriptorIndex (NFSMW_UBO ? NFSMW_COMPARTIDA_UINT({}) : vk::RawBufferLoad<uint>(g_PushConstants.SharedConstants + {}))",
+                        registerIndex, TEXTURE_DIMENSIONS[j], j * 64 + registerIndex * 4, j * 64 + registerIndex * 4);
+                }
+                println("#define s{}_SamplerDescriptorIndex (NFSMW_UBO ? NFSMW_COMPARTIDA_UINT({}) : vk::RawBufferLoad<uint>(g_PushConstants.SharedConstants + {}))",
+                    registerIndex, std::size(TEXTURE_DIMENSIONS) * 64 + registerIndex * 4, std::size(TEXTURE_DIMENSIONS) * 64 + registerIndex * 4);
+#ifdef NFSC_RECOMP
+                println("#define s{0}_Texture1DDescriptorIndex s{0}_Texture2DDescriptorIndex", registerIndex);
+#endif
+                const uint32_t invBase = 360 + registerIndex * 8;
+                println("#define s{}_InvTamano (NFSMW_UBO ? float2(NFSMW_COMPARTIDA_FLOAT({}), NFSMW_COMPARTIDA_FLOAT({})) : vk::RawBufferLoad<float2>(g_PushConstants.SharedConstants + {}))",
+                    registerIndex, invBase, invBase + 4, invBase);
+            }
             break;
         }
 
         }
+    }
+
+    // XDroid360 (Mass Effect, after masseffect-nx's MASSEFFECT fix): a fetch from a register no table entry
+    // names (an unnamed sampler, or a shader without a table) falls back to sN, which gets its set here;
+    // #ifndef passes over the ones already defined above. Unused in a shader that names all its samplers.
+    for (uint32_t reg = 0; reg < 32; reg++)
+    {
+        println("#ifndef s{}_SamplerDescriptorIndex", reg);
+        for (size_t j = 0; j < std::size(TEXTURE_DIMENSIONS); j++)
+        {
+            println("#define s{}_Texture{}DescriptorIndex (NFSMW_UBO ? NFSMW_COMPARTIDA_UINT({}) : vk::RawBufferLoad<uint>(g_PushConstants.SharedConstants + {}))",
+                reg, TEXTURE_DIMENSIONS[j], j * 64 + reg * 4, j * 64 + reg * 4);
+        }
+        println("#define s{}_SamplerDescriptorIndex (NFSMW_UBO ? NFSMW_COMPARTIDA_UINT({}) : vk::RawBufferLoad<uint>(g_PushConstants.SharedConstants + {}))",
+            reg, std::size(TEXTURE_DIMENSIONS) * 64 + reg * 4, std::size(TEXTURE_DIMENSIONS) * 64 + reg * 4);
+#ifdef NFSC_RECOMP
+        println("#define s{0}_Texture1DDescriptorIndex s{0}_Texture2DDescriptorIndex", reg);
+#endif
+        println("#define s{}_InvTamano (NFSMW_UBO ? float2(NFSMW_COMPARTIDA_FLOAT({}), NFSMW_COMPARTIDA_FLOAT({})) : vk::RawBufferLoad<float2>(g_PushConstants.SharedConstants + {}))",
+            reg, 360 + reg * 8, 364 + reg * 8, 360 + reg * 8);
+        println("#endif");
     }
 
     out += "\n#else\n\n";
@@ -1469,7 +1606,23 @@ void ShaderRecompiler::recompile(const uint8_t* shaderData, const std::string_vi
     else
     {
         auto vertexShader = reinterpret_cast<const VertexShader*>(shader);
-        for (uint32_t i = 0; i < vertexShader->vertexElementCount; i++)
+        // XDroid360 (after masseffect-nx): Direct3D's own vertex shaders are linked by fetch destination
+        // register: one TEXCOORD<register> input per full fetch, whatever the element table says (D3D binds
+        // these fetches by register). The native renderer reads the same fetches (nfsmw_nativo_shaders.cpp).
+        std::vector<std::pair<uint32_t, uint32_t>> fetchesByRegister;
+        if (linkByRegister)
+        {
+            const auto* words = reinterpret_cast<const be<uint32_t>*>(shaderData + shaderContainer->virtualSize + shader->physicalOffset);
+            std::vector<uint32_t> microcode(shader->size / 4);
+            for (size_t i = 0; i < microcode.size(); i++)
+                microcode[i] = words[i];
+            fetchesByRegister = VertexFetchesByRegister(microcode);
+            for (auto& [index, reg] : fetchesByRegister)
+                if (reg >= 8)
+                    throw std::runtime_error("vertex fetch to a register without a location (>= r8)");
+        }
+        const uint32_t elementCount = linkByRegister ? uint32_t(fetchesByRegister.size()) : uint32_t(vertexShader->vertexElementCount);
+        for (uint32_t i = 0; i < elementCount; i++)
         {
             union
             {
@@ -1477,7 +1630,35 @@ void ShaderRecompiler::recompile(const uint8_t* shaderData, const std::string_vi
                 uint32_t value;
             };
 
-            value = vertexShader->vertexElementsAndInterpolators[vertexShader->field18 + i];
+            if (linkByRegister)
+            {
+                value = 0;
+                vertexElement.address = fetchesByRegister[i].first;
+                vertexElement.usage = DeclUsage::TexCoord;
+                vertexElement.usageIndex = fetchesByRegister[i].second;
+            }
+            else
+                value = vertexShader->vertexElementsAndInterpolators[vertexShader->field18 + i];
+
+            // XDroid360 (Mass Effect, after masseffect-nx's MASSEFFECT fix): the element table can name the
+            // same usage and index for two fetches (UE3's terrain shaders fetch BLENDWEIGHT0 twice, into
+            // different registers). D3D binds a declaration element by usage and index, so both read the
+            // same data: the input is declared once and every fetch of it reads that one (a second
+            // declaration was a DXC parameter redefinition, and the shader was left out).
+            bool alreadyDeclared = false;
+            for (auto& [declaredAddress, declared] : vertexElements)
+            {
+                if (declared.usage == vertexElement.usage && declared.usageIndex == vertexElement.usageIndex)
+                {
+                    alreadyDeclared = true;
+                    break;
+                }
+            }
+            if (alreadyDeclared)
+            {
+                vertexElements.emplace(uint32_t(vertexElement.address), vertexElement);
+                continue;
+            }
 
             const char* usageType = USAGE_TYPES[uint32_t(vertexElement.usage)];
 
@@ -1546,7 +1727,9 @@ void ShaderRecompiler::recompile(const uint8_t* shaderData, const std::string_vi
         {
             auto definition = reinterpret_cast<const Float4Definition*>(definitions);
             auto value = reinterpret_cast<const be<uint32_t>*>(shaderData + shaderContainer->virtualSize + definition->physicalOffset);
-            for (uint16_t i = 0; i < (definition->count + 3) / 4; i++)
+            // XDroid360: not one whose values lie inside the microcode (validFloatDefinition, literalFloat4).
+            const uint16_t literals = validFloatDefinition(*definition) ? uint16_t((definition->count + 3) / 4) : 0;
+            for (uint16_t i = 0; i < literals; i++)
             {
                 println("\tfloat4 c{} = asfloat(uint4(0x{:X}, 0x{:X}, 0x{:X}, 0x{:X}));",
                     definition->registerIndex + i - (isPixelShader ? 256 : 0), value[0].get(), value[1].get(), value[2].get(), value[3].get());
@@ -1585,6 +1768,18 @@ void ShaderRecompiler::recompile(const uint8_t* shaderData, const std::string_vi
 
     bool printedRegisters[32]{};
 
+    // XDroid360 (Mass Effect): Direct3D's own shaders (linkByRegister) have no constant table, but their
+    // interpolator table (register -> usage) is still there, and the console links VS and PS through it.
+    // Scaleform's colour-fill pair is VS {0: TEXCOORD0, 1: COLOR0} with PS {0: COLOR0}: linked by register,
+    // the PS read the texture coordinates as its colour (the red/yellow/green UI panels). So interpolators
+    // are linked by usage like any other shader; export register N -> TEXCOORDN stays only as the fallback
+    // for an export the table doesn't list.
+    if (linkByRegister && !isPixelShader)
+    {
+        for (uint32_t i = 0; i < 16; i++)
+            interpolators.emplace(i, fmt::format("oTexCoord{}", i));
+    }
+
     uint32_t interpolatorCount = (shader->interpolatorInfo >> 5) & 0x1F;
 
     for (uint32_t i = 0; i < interpolatorCount; i++)
@@ -1605,7 +1800,7 @@ void ShaderRecompiler::recompile(const uint8_t* shaderData, const std::string_vi
         {
             auto vertexShader = reinterpret_cast<const VertexShader*>(shader);
             value = vertexShader->vertexElementsAndInterpolators[vertexShader->field18 + vertexShader->vertexElementCount + i];
-            interpolators.emplace(i, fmt::format("o{}{}", USAGE_VARIABLES[uint32_t(interpolator.usage)], uint32_t(interpolator.usageIndex)));
+            interpolators[i] = fmt::format("o{}{}", USAGE_VARIABLES[uint32_t(interpolator.usage)], uint32_t(interpolator.usageIndex));
         }
     }
 
@@ -1617,7 +1812,16 @@ void ShaderRecompiler::recompile(const uint8_t* shaderData, const std::string_vi
     #endif
 
         for (auto& [usage, usageIndex] : INTERPOLATORS)
-            println("\to{}{} = 0.0;", USAGE_VARIABLES[uint32_t(usage)], usageIndex);
+        {
+            // Xenos' default for an interpolator the vertex shader doesn't export is (0, 0, 0, 1). It
+            // matters for register-linked Direct3D shaders: Mass Effect's UI pixel shader multiplies its
+            // alpha by r1.w while some paired vertex shaders only export r0 (masseffect-nx: all zeros made
+            // the UI fully transparent).
+            if (linkByRegister)
+                println("\to{}{} = float4(0.0, 0.0, 0.0, 1.0);", USAGE_VARIABLES[uint32_t(usage)], usageIndex);
+            else
+                println("\to{}{} = 0.0;", USAGE_VARIABLES[uint32_t(usage)], usageIndex);
+        }
 
         out += "\n";
     }
