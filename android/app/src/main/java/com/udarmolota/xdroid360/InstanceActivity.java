@@ -234,8 +234,8 @@ public class InstanceActivity extends AppCompatActivity {
         findViewById(R.id.language_card).setVisibility(View.VISIBLE);
         bindRadios(findViewById(R.id.language), languageLabels, Math.max(0, languageIds.indexOf(instance.language)),
                 i -> instance.language = languageIds.get(i));
-        // The renderer, for the games that have the native one.
-        if (instance.hasNativeRenderer()) {
+        // The renderer, for the games that have the native one besides Xenia's.
+        if (instance.hasNativeRenderer() && !instance.nativeRendererOnly()) {
             findViewById(R.id.renderer_card).setVisibility(View.VISIBLE);
             // "Native" with a small green "NEW" tag after it.
             String label = getString(R.string.renderer_native);

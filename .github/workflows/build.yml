@@ -6,8 +6,9 @@ name: Build XDroid360
 #              hours), the patched XenonRecomp, the STFS extractor, the native renderer's
 #              shader library tool with DXC (cached), and the kit.
 #   apk        DAO's game profile (dao.zip), built here from DAORecomp's runtime (the recomp
-#              fork) and profiles/dao (no game code or data); State of Decay's profile from
-#              SoDRecomp's release, by the asset and SHA-256 pinned in android/toolchain.lock.json;
+#              fork) and profiles/dao (no game code or data); State of Decay's and Mass Effect's
+#              profiles from SoDRecomp's and ME1Recomp's releases, by the assets and SHA-256s
+#              pinned in android/toolchain.lock.json;
 #              then the release APK, checked to carry all of it.
 #
 # Signing: the release APK is signed with the release key when the repository's secrets hold it
@@ -199,7 +200,7 @@ jobs:
 
       # A profile made for other tools than the kit's would be refused on the phone.
       - name: Check the profiles against the kit
-        run: python3 -I scripts/check_profiles.py build/toolchain/kit/kit.json build/profile/dao.zip build/fetched/games/sod.zip
+        run: python3 -I scripts/check_profiles.py build/toolchain/kit/kit.json build/profile/dao.zip build/fetched/games/sod.zip build/fetched/games/me1.zip
 
       # The key store goes to the runner's temp folder, never into the workspace.
       - name: Set up release signing
@@ -228,13 +229,14 @@ jobs:
         run: |
           chmod +x gradlew
           ./gradlew assembleLauncherRelease -Pxdroid360.toolchain="$GITHUB_WORKSPACE/build/toolchain" \
-            -Pxdroid360.sodProfile="$GITHUB_WORKSPACE/build/fetched/games/sod.zip"
+            -Pxdroid360.sodProfile="$GITHUB_WORKSPACE/build/fetched/games/sod.zip" \
+            -Pxdroid360.me1Profile="$GITHUB_WORKSPACE/build/fetched/games/me1.zip"
 
       - name: Remove the key store
         if: always()
         run: rm -f "$RUNNER_TEMP/release.keystore" android/keystore.properties
 
-      # The APK must carry the toolchain and both profiles, or it can't build a game.
+      # The APK must carry the toolchain and the games' profiles, or it can't build a game.
       - name: Check the APK's contents
         shell: bash
         run: |
@@ -244,7 +246,7 @@ jobs:
           for f in lib/arm64-v8a/libclang.so lib/arm64-v8a/liblld.so lib/arm64-v8a/libxenonrecomp.so \
                    lib/arm64-v8a/libstfsextract.so lib/arm64-v8a/libshaderlib.so \
                    lib/arm64-v8a/libdxcompiler.so lib/arm64-v8a/libSDL3.so assets/kit.zip \
-                   assets/games/dao.zip assets/games/sod.zip; do
+                   assets/games/dao.zip assets/games/sod.zip assets/games/me1.zip; do
             # A here-string, not a pipe: grep -q stops at the first match, and the writer of a
             # pipe would then fail with "Broken pipe" under pipefail.
             grep -q " $f\$" <<< "$LIST" || { echo "missing in the APK: $f"; exit 1; }

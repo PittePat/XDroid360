@@ -25,6 +25,9 @@ def daoProfile = file("${rootDir}/../build/profile/dao.zip")
 // State of Decay's profile as SoDRecomp's make_profile.sh writes it (else the toolchain folder's
 // games/, as fetch_toolchain.py lays it out). Override with -Pxdroid360.sodProfile=<zip>.
 def sodProfile = file(project.findProperty("xdroid360.sodProfile") ?: "${rootDir}/../../SD1/sod360/build/out/sod.zip")
+// Mass Effect's profile from ME1Recomp's release, as scripts/fetch_toolchain.py --out build/fetched
+// lays it out (games/me1.zip, pinned in toolchain.lock.json). Override with -Pxdroid360.me1Profile=<zip>.
+def me1Profile = file(project.findProperty("xdroid360.me1Profile") ?: "${rootDir}/../build/fetched/games/me1.zip")
 def toolchainAssets = layout.buildDirectory.dir("generated/toolchain/assets")
 def copyToolchainAssets = tasks.register("copyToolchainAssets", Sync) {
     into toolchainAssets
@@ -32,6 +35,12 @@ def copyToolchainAssets = tasks.register("copyToolchainAssets", Sync) {
     from(file("${toolchainOut}/games")) {
         include "*.zip"
         if (sodProfile.isFile()) exclude "sod.zip"
+        if (me1Profile.isFile()) exclude "me1.zip"
+        into "games"
+    }
+    from(me1Profile.parentFile) {
+        include me1Profile.name
+        rename { "me1.zip" }
         into "games"
     }
     from(sodProfile.parentFile) {

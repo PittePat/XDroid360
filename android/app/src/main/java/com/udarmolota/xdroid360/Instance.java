@@ -23,6 +23,7 @@ final class Instance {
     static final String DEV_ID = "dev";
     static final String DAO_TITLE_ID = "454108C0";
     static final String SOD_TITLE_ID = "584111E8";
+    static final String ME1_TITLE_ID = "4D5307E8";
 
     // Settings, kept in instance.json.
     /** auto: the built-in Turnip on an Adreno 8xx (what it is made for), else the phone's own. */
@@ -114,16 +115,27 @@ final class Instance {
     String renderer = "";
 
     /**
-     * Whether the game has the native renderer, so the settings offer the choice. Both games read
-     * the same key and fall back to Xenia by themselves while the shader library is missing.
+     * Whether the game has the native renderer: the launcher writes the key, and the settings offer
+     * the choice unless it is the only one (nativeRendererOnly). DAO and SoD read the same key and
+     * fall back to Xenia by themselves while the shader library is missing.
      */
     boolean hasNativeRenderer() {
         String id = titleId();
-        return DAO_TITLE_ID.equals(id) || SOD_TITLE_ID.equals(id);
+        return DAO_TITLE_ID.equals(id) || SOD_TITLE_ID.equals(id) || ME1_TITLE_ID.equals(id);
+    }
+
+    /**
+     * Whether the native renderer is the game's only one, so the settings offer no choice and the
+     * launcher always writes "native": Mass Effect, whose Xenia path never drew more than a black or
+     * white screen, and whose runtime would start that path were the key unset.
+     */
+    boolean nativeRendererOnly() {
+        return ME1_TITLE_ID.equals(titleId());
     }
 
     /** The renderer to start with: the chosen one, else native for a game that has it, else Xenia. */
     String rendererToUse() {
+        if (nativeRendererOnly()) return RENDERER_NATIVE;
         if (RENDERER_NATIVE.equals(renderer) || RENDERER_XENIA.equals(renderer)) return renderer;
         return hasNativeRenderer() ? RENDERER_NATIVE : RENDERER_XENIA;
     }

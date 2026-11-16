@@ -16,7 +16,8 @@ import java.nio.file.Files;
  * instance's banner.jpg on import; BitmapFactory reads either); the game's own splash screen
  * (game/splash.dds, from the player's disc), decoded once into banner.jpg; the launcher's
  * picture for that title ID (res/drawable-nodpi/banner_<title id>.jpg), for games without a
- * splash screen in their files (State of Decay).
+ * splash screen in their files (State of Decay, and Mass Effect: art she picked); else the disc's
+ * boot splash (game/Layer1/Splash.bmp), decoded once into banner.jpg.
  */
 final class Banner {
     private Banner() {}
@@ -31,7 +32,13 @@ final class Banner {
         if (!banner.isFile()) {
             try {
                 Bitmap made = decodeDds(new File(instance.game(), "splash.dds"));
-                if (made == null) return builtIn(context, instance);
+                if (made == null) {
+                    Bitmap ours = builtIn(context, instance);
+                    if (ours != null) return ours;
+                    File boot = new File(instance.game(), "Layer1/Splash.bmp");
+                    if (boot.isFile()) made = BitmapFactory.decodeFile(boot.getAbsolutePath());
+                }
+                if (made == null) return null;
                 // A card is wide: half the size is plenty.
                 Bitmap small = Bitmap.createScaledBitmap(made, made.getWidth() / 2, made.getHeight() / 2, true);
                 try (FileOutputStream out = new FileOutputStream(banner)) {
@@ -50,6 +57,7 @@ final class Banner {
     private static Bitmap builtIn(Context context, Instance instance) {
         switch (instance.titleId()) {
             case "584111E8": return BitmapFactory.decodeResource(context.getResources(), R.drawable.banner_584111e8);
+            case "4D5307E8": return BitmapFactory.decodeResource(context.getResources(), R.drawable.banner_4d5307e8);
             default: return null;
         }
     }

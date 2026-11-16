@@ -1,12 +1,19 @@
 {
-  "comment": "What the APK takes from other repositories' releases, by exact asset and SHA-256 (scripts/fetch_toolchain.py): State of Decay's profile. The toolchain itself is built by this repository's CI (toolchain/). Change only to a new release, with its published hash.",
+  "comment": "What the APK takes from other repositories' releases, by exact asset and SHA-256 (scripts/fetch_toolchain.py): State of Decay's and Mass Effect's profiles. The toolchain itself is built by this repository's CI (toolchain/). Change only to a new release, with its published hash.",
   "assets": [
     {
       "repo": "udarmolota/SoDRecomp",
-      "tag": "profile-sod-6",
-      "asset": "xdroid360-profile-sod-6.zip",
-      "sha256": "a8debcca33dbd3a2300b04b7071763ecb0219003984d70707c30c74c7516fc23",
+      "tag": "profile-sod-7",
+      "asset": "xdroid360-profile-sod-7.zip",
+      "sha256": "63eac94fb89a1ff8b838f7749e55cc80b59d141894b7be48c2503bc7ce999dfc",
       "as": "games/sod.zip"
+    },
+    {
+      "repo": "udarmolota/ME1Recomp",
+      "tag": "profile-me1-1",
+      "asset": "xdroid360-profile-me1-1.zip",
+      "sha256": "19d64c1f19b0f60d2e71a313668b5c644a251ac402fc7d48cb6eb25eac6ddaa5",
+      "as": "games/me1.zip"
     }
   ]
 }
