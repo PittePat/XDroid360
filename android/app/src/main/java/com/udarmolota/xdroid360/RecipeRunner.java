@@ -531,10 +531,13 @@ final class RecipeRunner {
         File obj = new File(work, "obj");
         File[] objDirs = obj.listFiles();
         if (objDirs != null) for (File d : objDirs) if (!kept.contains(d.getName())) Instance.deleteTree(d);
-        File ppc = new File(work, "ppc");
-        File[] sources = ppc.listFiles((d, n) -> n.endsWith(".cpp"));
-        if (sources != null) for (File s : sources) Instance.deleteTree(s);
-        if (ppc.isDirectory()) keep.add(ppc);
+        // ppc/, and ppc_tu/ for a game built with a title update (DAO): the headers stay for build-info.
+        for (String name : new String[] { "ppc", "ppc_tu" }) {
+            File ppc = new File(work, name);
+            File[] sources = ppc.listFiles((d, n) -> n.endsWith(".cpp"));
+            if (sources != null) for (File s : sources) Instance.deleteTree(s);
+            if (ppc.isDirectory()) keep.add(ppc);
+        }
         try {
             touch(new File(work, "update.fingerprint"));
             Files.write(new File(work, "update.fingerprint").toPath(), fingerprint().getBytes(StandardCharsets.UTF_8));

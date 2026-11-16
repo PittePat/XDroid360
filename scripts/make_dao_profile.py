@@ -219,6 +219,8 @@ def recipe(kit, xex_sha256s, headers, headers_tu):
            "-fstack-protector-strong", "-D_FORTIFY_SOURCE=2", "-O3", "-DNDEBUG",
            "-std=gnu++20", "-fPIC"]
 
+    # In vars, not in the steps: RecipeRunner.firstProfileStep looks for ${PROFILE}/include in the
+    # steps' own text, and what comes before that step is reused by "Update game".
     def ppcflags(ppc):
         return ["-fno-strict-aliasing", "-ffp-model=strict", "-ffp-contract=off",
                 "-Wno-unused-label", "-Wno-unused-variable", "-Wno-unused-but-set-variable",
@@ -229,6 +231,9 @@ def recipe(kit, xex_sha256s, headers, headers_tu):
         return ["-Xclang", "-include-pch", "-Xclang", f"{folder}/pch.hxx.pch",
                 "-Xclang", "-include", "-Xclang", f"{folder}/pch.hxx"]
 
+    flags = {"PPCFLAGS": ppcflags("${WORK}/ppc"), "PCH": pch("${WORK}/pch"),
+             "PPCFLAGS_TU": ppcflags("${WORK}/ppc_tu"), "PCH_TU": pch("${WORK}/pch_tu")}
+
     builtins = "${KIT}/clang/lib/libclang_rt.builtins-aarch64-android.a"
     lib = "${KIT}/sysroot/usr/lib/aarch64-linux-android"
     update = "${GAME}/title_update/default.xexp"
@@ -237,8 +242,11 @@ def recipe(kit, xex_sha256s, headers, headers_tu):
         """Translating, compiling and linking the game's code: the disc's, or with Title Update 6 or
         7 installed (${GAME}/title_update, where the STFS reader puts it) only the title update's,
         in folders of its own, linked with the runtime built for it (libdao-game-tu.a,
-        DAO_TU_ONLY). Exactly one of the two sets runs, by whether the title update is there."""
+        DAO_TU_ONLY). Exactly one of the two sets runs, by whether the title update is there.
+        Returned as (compiling, linking): both sets' compiling steps go before either's linking
+        steps, the first to read the profile's include/ and lib/ (see flags)."""
         s = "-tu" if tu else ""
+        v = "_TU" if tu else ""
         ppc = "${WORK}/ppc" + ("_tu" if tu else "")
         pch_dir = "${WORK}/pch" + ("_tu" if tu else "")
         heads = headers_tu if tu else headers
@@ -259,14 +267,16 @@ def recipe(kit, xex_sha256s, headers, headers_tu):
              "path": pch_dir + "/pch.hxx",
              "text": "#pragma clang system_header\n#include \"" + ppc + "/ppc_recomp_shared.h\"\n"},
             {"id": "pch" + s, "kind": "run", "label": "Preparing compiler", "weight": 2, "tool": "clang",
-             "args": ["@CXXFLAGS"] + ppcflags(ppc) + ["-x", "c++-header", pch_dir + "/pch.hxx",
-                                                      "-o", pch_dir + "/pch.hxx.pch"]},
+             "args": ["@CXXFLAGS", "@PPCFLAGS" + v, "-x", "c++-header", pch_dir + "/pch.hxx",
+                      "-o", pch_dir + "/pch.hxx.pch"]},
             {"id": "game-code" + s, "kind": "each", "label": "Compiling game code", "weight": 180,
              "tool": "clang",
              "inputs": {"glob": ppc + "/ppc_recomp.*.cpp", "plus": [ppc + "/ppc_func_mapping.cpp"]},
-             "args": ["@CXXFLAGS"] + ppcflags(ppc) + pch(pch_dir) + ["-c", "${IN}", "-o", "${OBJ}"],
+             "args": ["@CXXFLAGS", "@PPCFLAGS" + v, "@PCH" + v, "-c", "${IN}", "-o", "${OBJ}"],
              "objects": "${WORK}/obj/game-code" + s,
              "schedule": "longest_first", "cost_hints": {} if tu else COST_HINTS, "fail": "stop"},
+        ]
+        linking = [
             {"id": "build-info" + s, "kind": "each", "label": "Compiling game code", "weight": 2,
              "tool": "clang",
              "inputs": {"plus": ["${PROFILE}/include/build_info_android.cpp"]},
@@ -295,10 +305,11 @@ def recipe(kit, xex_sha256s, headers, headers_tu):
                       builtins, "-l:libunwind.a", "-ldl",
                       lib + "/29/crtend_so.o"]},
         ]
-        for step in steps:
+        for step in steps + linking:
             step["when"] = when
-        return steps
+        return steps, linking
 
+    disc, tu = code_steps(False), code_steps(True)
     return {
         "format": 2,
         "version": VERSION,
@@ -310,7 +321,7 @@ def recipe(kit, xex_sha256s, headers, headers_tu):
         # work: 253 MB of generated C++, 378 MB of objects (kept for "Update game"), the PCH.
         "space": {"game_mb": 6815, "work_mb": 1000, "install_mb": 300},
         "inputs": {"xex": {"path": "${GAME}/game/default.xex", "sha256": xex_sha256s}},
-        "vars": {"CXXFLAGS": cxx},
+        "vars": {"CXXFLAGS": cxx, **flags},
         "jobs": {"max_rss_mb": 400, "reserve_mb": 768},
         "steps": [
             {"id": "extract", "kind": "extract", "label": "Extracting game files", "weight": 120,
@@ -326,7 +337,7 @@ def recipe(kit, xex_sha256s, headers, headers_tu):
              "args": ["${GAME}/game/packages/core/data/shaders.erf", "${GAME}/userdata/nfsmw_shaders.nfsp",
                       "-j", "${JOBS}"],
              "progress": "progress ([0-9]+)/([0-9]+)"},
-        ] + code_steps(False) + code_steps(True),
+        ] + disc[0] + tu[0] + disc[1] + tu[1],
         "result": {"library": "${WORK}/libgame.so", "install": "${INSTANCE}/libgame.so", "keep": ["${WORK}/logs"]},
     }
 
