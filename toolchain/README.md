@@ -167,12 +167,12 @@ Every source is pinned in `env.sh`:
 |---|---|
 | LLVM | 22.1.8: the release tarball and its sha256 |
 | XenonRecomp | commit `ddd128b` |
-| Patch script | the XDroid360 games' one patch script (DAORecomp fork, `scripts/patch_recompiler.py`), commit `86b9d0b` and its sha256 |
+| Patch script | the XDroid360 games' one patch script (DAORecomp fork, `scripts/patch_recompiler.py`), commit `bfbaa87` and its sha256 |
 | SDL | commit `829a65d` (3.4.18) |
 | DXC | commit `01b62ad` (v1.9.2609), with its submodules |
 | NDK | 27.3.13750724 |
 
-The kit's `kit.json` names the XenonRecomp version as `ddd128b-p86b9d0b`: its commit and the
+The kit's `kit.json` names the XenonRecomp version as `ddd128b-pbfbaa87`: its commit and the
 patch script's.
 
 On any machine:
