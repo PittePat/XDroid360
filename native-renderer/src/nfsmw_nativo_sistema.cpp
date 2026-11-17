@@ -1058,7 +1058,10 @@ class SistemaGraficoNativo final : public rex::system::IGraphicsSystem {
     const bool marcas_antes = direccion >= 32 && marcada(memory_->TranslatePhysical<Cuentas*>(direccion - 32));
     int32_t modo = REXCVAR_GET(nfsmw_nativo_oclusion);
     if (modo == 1 && destinos_ && !destinos_->OclusionGpuPermitida()) {
-      modo = 2;  // safe fallback: no flare or driver occlusion calls
+      // Safe fallback without driver occlusion calls (Mali). Games that need a growing count (State of Decay
+      // reads 0 samples as "nothing visible" and culls its whole colour pass) get the faked free-running
+      // counter, as on GPUs whose unpaired queries take that path; the rest get no flare.
+      modo = REXCVAR_GET(xdroid360_oclusion_acumulada) ? 0 : 2;
     }
     // Test cvar nfsmw_nativo_oclusion_alternar_s: odd intervals use the old faked count.
     if (const int32_t alternar_s = REXCVAR_GET(nfsmw_nativo_oclusion_alternar_s); modo == 1 && alternar_s > 0) {
