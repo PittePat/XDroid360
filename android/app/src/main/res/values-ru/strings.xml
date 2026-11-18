@@ -20,7 +20,7 @@
 
     <string name="setting_driver">Драйвер Vulkan</string>
     <string name="setting_driver_pick">Выбрать файл драйвера (.so или .zip)…</string>
-    <string name="setting_driver_hint">Автоматически: встроенный Turnip на Adreno 8xx, системный драйвер на любой другой видеокарте. Встроенный Turnip: всегда (для Adreno 8xx). Системный драйвер: родной драйвер телефона. Свой драйвер: файл драйвера, который вы выберете.</string>
+    <string name="setting_driver_hint">Автоматически: встроенный Turnip на Adreno 8xx и 7xx, системный драйвер на любой другой видеокарте. Встроенный Turnip: всегда (для Adreno 8xx и 7xx). Системный драйвер: родной драйвер телефона. Свой драйвер: файл драйвера, который вы выберете.</string>
     <string-array name="drivers">
         <item>Автоматически</item>
         <item>Встроенный Turnip</item>

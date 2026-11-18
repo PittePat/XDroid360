@@ -26,7 +26,7 @@ final class Instance {
     static final String ME1_TITLE_ID = "4D5307E8";
 
     // Settings, kept in instance.json.
-    /** auto: the built-in Turnip on an Adreno 8xx (what it is made for), else the phone's own. */
+    /** auto: the built-in Turnip on an Adreno 8xx (what it is made for) or 7xx, else the phone's own. */
     static final String DRIVER_AUTO = "auto", DRIVER_BUILTIN = "builtin", DRIVER_SYSTEM = "system", DRIVER_CUSTOM = "custom";
     static final String SYSMEM_AUTO = "auto", SYSMEM_ON = "on", SYSMEM_OFF = "off";
 

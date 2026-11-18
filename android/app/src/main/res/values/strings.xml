@@ -22,7 +22,7 @@
 
     <string name="setting_driver">Vulkan driver</string>
     <string name="setting_driver_pick">Choose a driver file (.so or .zip)…</string>
-    <string name="setting_driver_hint">Automatic: the built-in Turnip on an Adreno 8xx, the system driver on any other GPU. Built-in Turnip: always (for an Adreno 8xx). System driver: the phone\'s own. Custom driver: a driver file you choose.</string>
+    <string name="setting_driver_hint">Automatic: the built-in Turnip on an Adreno 8xx or 7xx, the system driver on any other GPU. Built-in Turnip: always (for an Adreno 8xx or 7xx). System driver: the phone\'s own. Custom driver: a driver file you choose.</string>
     <string-array name="drivers">
         <item>Automatic</item>
         <item>Built-in Turnip</item>

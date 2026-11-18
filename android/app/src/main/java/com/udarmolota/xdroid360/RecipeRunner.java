@@ -595,6 +595,11 @@ final class RecipeRunner {
         List<String> argv = new ArrayList<>();
         argv.add(exe.getPath());
         argv.addAll(vars.args(args, extra, objects));
+        // lld 22's parallel relocation scan (RelocScan::scan) at times corrupts its heap on the
+        // phone: Android aborts it ("Pointer tag ... was truncated") at the link of Dragon Age,
+        // and the same link passes on a retry (Xiaomi 12, Adreno 730, 0.1.3). One thread avoids
+        // the race, for a few seconds more of a link.
+        if ("lld".equals(tool) && argv.contains("gnu")) argv.add("--threads=1");
         return argv;
     }
 

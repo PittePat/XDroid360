@@ -566,10 +566,12 @@ public class GameActivity extends SDLActivity {
     static File chosenDriver(Context context, Instance current, File install) {
         String choice = current != null ? current.driver : Instance.DRIVER_CUSTOM;
         if (Instance.DRIVER_AUTO.equals(choice)) {
-            // Turnip Gen8 is for Adreno 8xx only: any other GPU (Mali, Xclipse, an older Adreno)
-            // gets the phone's own driver unless the player installs one.
+            // The built-in Turnip on an Adreno 8xx (what it is made for) and 7xx (it draws there too:
+            // Adreno 730, Xiaomi 12; the phone's own Adreno driver leaves the native renderer a
+            // white screen). Any other GPU (Mali, Xclipse, an older Adreno) gets the phone's own
+            // driver unless the player installs one.
             String gpu = gpuModel();
-            choice = gpu.startsWith("Adreno8") ? Instance.DRIVER_BUILTIN : Instance.DRIVER_SYSTEM;
+            choice = gpu.startsWith("Adreno8") || gpu.startsWith("Adreno7") ? Instance.DRIVER_BUILTIN : Instance.DRIVER_SYSTEM;
             Log.i(TAG, "Driver auto: GPU '" + gpu + "' -> " + choice);
         }
         if (Instance.DRIVER_SYSTEM.equals(choice)) {
