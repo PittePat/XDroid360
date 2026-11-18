@@ -14,6 +14,8 @@ import android.os.PowerManager;
 import androidx.core.app.NotificationCompat;
 import androidx.core.app.ServiceCompat;
 
+import org.json.JSONObject;
+
 import java.io.File;
 import java.io.IOException;
 import java.util.Map;
@@ -97,17 +99,35 @@ public class BuildService extends Service {
         return START_NOT_STICKY;
     }
 
+    /** A recipe stamp without its profile version: the format, game, kit and tools. */
+    private static String withoutVersion(JSONObject stamp) {
+        try {
+            JSONObject o = new JSONObject(stamp.toString());
+            o.remove("version");
+            return o.toString();
+        } catch (org.json.JSONException e) {
+            return stamp.toString();
+        }
+    }
+
     private void build(BuildJob job, Status status) {
         try {
             Recipe recipe = Toolchain.profile(this, job.profileId);
             if (recipe == null) throw new Recipe.Failure("unknown_title", "no profile " + job.profileId + " in this launcher");
             String mismatch = Toolchain.mismatch(this, recipe);
             if (mismatch != null) throw new Recipe.Failure("profile_mismatch", mismatch);
-            // Another recipe, kit or tools than the build started with: its scratch files are void
-            // (the extracted game files stay, by their own markers).
-            if (!recipe.stamp().toString().equals(job.stamp.toString())) {
-                Instance.deleteTree(job.work(this));
-                job.stamp = recipe.stamp();
+            // Another format, game, kit or tools than the build started with: its scratch files are
+            // void (the extracted game files stay, by their own markers). A new version of the same
+            // game's profile alone keeps them: the compiled game code kept for an update
+            // (RecipeRunner.keepForUpdate) stands while the profile files it read are the same,
+            // which RecipeRunner.run checks by its fingerprint. Usually only the runtime changes,
+            // and an update then skips the long compile.
+            JSONObject stamp = recipe.stamp();
+            if (!stamp.toString().equals(job.stamp.toString())) {
+                // (Only a finished build's kept work has that fingerprint; a stopped one's goes.)
+                boolean kept = new File(job.work(this), "update.fingerprint").isFile();
+                if (!kept || !withoutVersion(stamp).equals(withoutVersion(job.stamp))) Instance.deleteTree(job.work(this));
+                job.stamp = stamp;
             }
             job.state = BuildJob.RUNNING;
             job.errorCode = job.errorDetail = job.failedStep = "";
