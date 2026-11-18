@@ -8981,6 +8981,11 @@ class DibujosVulkanImpl final : public DibujosVulkan {
           formato_gamma = gamma_ok_[2] ? VK_FORMAT_BC2_SRGB_BLOCK : VK_FORMAT_UNDEFINED;
         } else if (formato_host == VK_FORMAT_BC3_UNORM_BLOCK) {
           formato_gamma = gamma_ok_[3] ? VK_FORMAT_BC3_SRGB_BLOCK : VK_FORMAT_UNDEFINED;
+        } else if (formato_host == VK_FORMAT_A1R5G5B5_UNORM_PACK16) {
+          // BC1 decoded on the CPU (Mali): A1R5G5B5 has no sRGB variant, so a gamma texture stays RGBA8
+          // and goes sRGB (the upload below packs to 16 bits only when the image is A1R5G5B5). Without this
+          // SoD's albedo on GPUs without BC was read without gamma: an overbright, washed-out picture.
+          formato_gamma = gamma_ok_[0] ? VK_FORMAT_R8G8B8A8_SRGB : VK_FORMAT_UNDEFINED;
         }
         if (!color_del_color) {
           camino_signos = kSignosSwizzle;
@@ -9660,7 +9665,7 @@ class DibujosVulkanImpl final : public DibujosVulkan {
         return;
       }
       datos.swap(temporal_bc_);
-      if (indice_bc == 1 && bc1_16_) {  // nfsmw_nativo_bc1_16_bits
+      if (indice_bc == 1 && formato_host == VK_FORMAT_A1R5G5B5_UNORM_PACK16) {  // nfsmw_nativo_bc1_16_bits
         EmpaquetarA16(datos, Empaquetado16::kArgb1555);
         for (uint32_t n = 0; n < textura.niveles; ++n) {
           textura.desplazamiento_nivel[n] /= 2;
