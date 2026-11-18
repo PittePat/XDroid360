@@ -391,6 +391,12 @@ REXCVAR_DEFINE_STRING(xdroid360_color_sin_nan, "auto", "NFSMW",
                       "does by itself. auto = on with Arm's Mali driver and PanVK (State of Decay: flickering pink/"
                       "black patches on characters); on = every GPU; off = never")
     .lifecycle(rex::cvar::Lifecycle::kInitOnly);
+REXCVAR_DEFINE_STRING(xdroid360_posicion_invariante, "auto", "NFSMW",
+                      "XDroid360: vertex shaders get their Position output marked Invariant "
+                      "(nfsmw_spirv_sin_nan.h), so a depth pass and a depth-EQUAL color pass with different vertex "
+                      "shaders agree bit for bit. auto = on with Arm's Mali driver and PanVK (State of Decay: "
+                      "flickering patches on characters that show the background); on = every GPU; off = never")
+    .lifecycle(rex::cvar::Lifecycle::kInitOnly);
 
 REXCVAR_DEFINE_BOOL(nfsmw_nativo_texturas_bc_cpu, false, "NFSMW",
                     "Forzar conversion BC1-5 en CPU para probar la ruta de GPU sin texturas BC")
@@ -2159,6 +2165,10 @@ class DibujosVulkanImpl final : public DibujosVulkan {
       color_sin_nan_ = modo == "on" || (modo == "auto" && mali);
       REXLOG_INFO("[compatibilidad] color NaN a 0 en los pixel shaders: {} (opcion {})",
                   color_sin_nan_ ? "si" : "no", modo);
+      const std::string invariante = REXCVAR_GET(xdroid360_posicion_invariante);
+      posicion_invariante_ = invariante == "on" || (invariante == "auto" && mali);
+      REXLOG_INFO("[compatibilidad] posicion invariante en los vertex shaders: {} (opcion {})",
+                  posicion_invariante_ ? "si" : "no", invariante);
     }
     // nfsmw_nativo_abanicos_a_listas. MoltenVK has no triangleFans in its portability subset.
     abanicos_a_listas_ =
@@ -10981,6 +10991,13 @@ class DibujosVulkanImpl final : public DibujosVulkan {
         info.pCode = convertido.data();
       }
     }
+    if (posicion_invariante_) {  // xdroid360_posicion_invariante; leaves pixel shaders untouched
+      if (convertido.empty()) convertido.assign(spirv, spirv + bytes / 4);
+      if (nfsmw::nativo::PosicionInvariante(convertido)) {
+        info.codeSize = convertido.size() * sizeof(uint32_t);
+        info.pCode = convertido.data();
+      }
+    }
     if (cuatro_conjuntos_) {
       if (convertido.empty()) convertido.assign(spirv, spirv + bytes / 4);
       if (!nfsmw::spirv::JuntarConjuntos(convertido)) {
@@ -12812,6 +12829,7 @@ class DibujosVulkanImpl final : public DibujosVulkan {
   // enlaza de los montones (el de cubos va dentro del 1), cuantos son y en que conjunto van los UBO.
   bool cuatro_conjuntos_ = false;
   bool color_sin_nan_ = false;  // xdroid360_color_sin_nan (CrearModulo)
+  bool posicion_invariante_ = false;  // xdroid360_posicion_invariante (CrearModulo)
   std::array<VkDescriptorSet, 4> sets_enlace_{};
   uint32_t n_sets_enlace_ = 4;
   uint32_t conjunto_ubo_ = 4;

@@ -2,6 +2,7 @@
 
 #include "nfsmw_spirv_sin_nan.h"
 
+#include <cstddef>
 #include <map>
 
 namespace nfsmw::nativo {
@@ -188,6 +189,48 @@ uint32_t ColorSinNan(std::vector<uint32_t>& spirv) {
   nuevo[3] = limite;
   spirv.swap(nuevo);
   return uint32_t(almacenes.size());
+}
+
+uint32_t PosicionInvariante(std::vector<uint32_t>& spirv) {
+  constexpr uint32_t kOpDecorate = 71, kOpMemberDecorate = 72, kOpTypeVoid = 19, kOpTypeForwardPointer = 39;
+  constexpr uint32_t kDecorationBuiltIn = 11, kDecorationInvariant = 18, kBuiltInPosition = 0;
+  constexpr uint32_t kExecutionModelVertex = 0;
+  if (spirv.size() < 5 || spirv[0] != 0x07230203u || spirv[3] == 0 || spirv[3] > kMaxBound) {
+    return 0;
+  }
+  bool vertices = false, ya = false;
+  size_t donde_insertar = 0;
+  std::vector<uint32_t> decoraciones;
+  for (size_t pos = 5; pos < spirv.size();) {
+    const uint32_t n = spirv[pos] >> 16, op = spirv[pos] & 0xFFFF;
+    if (n == 0 || pos + n > spirv.size()) {
+      return 0;
+    }
+    const uint32_t* w = spirv.data() + pos;
+    if (op == kOpEntryPoint && n >= 2 && w[1] == kExecutionModelVertex) {
+      vertices = true;
+    } else if (op == kOpDecorate && n >= 3) {
+      if (w[2] == kDecorationInvariant) {
+        ya = true;
+      } else if (w[2] == kDecorationBuiltIn && n >= 4 && w[3] == kBuiltInPosition) {
+        decoraciones.insert(decoraciones.end(), {Palabra(3, kOpDecorate), w[1], kDecorationInvariant});
+      }
+    } else if (op == kOpMemberDecorate && n >= 4) {
+      if (w[3] == kDecorationInvariant) {
+        ya = true;
+      } else if (w[3] == kDecorationBuiltIn && n >= 5 && w[4] == kBuiltInPosition) {
+        decoraciones.insert(decoraciones.end(), {Palabra(4, kOpMemberDecorate), w[1], w[2], kDecorationInvariant});
+      }
+    } else if (!donde_insertar && op >= kOpTypeVoid && op <= kOpTypeForwardPointer) {
+      donde_insertar = pos;  // the first type: the annotations end right before it
+    }
+    pos += n;
+  }
+  if (!vertices || ya || decoraciones.empty() || !donde_insertar) {
+    return 0;
+  }
+  spirv.insert(spirv.begin() + ptrdiff_t(donde_insertar), decoraciones.begin(), decoraciones.end());
+  return 1;
 }
 
 }  // namespace nfsmw::nativo

@@ -16,4 +16,12 @@ namespace nfsmw::nativo {
 // a vertex shader or SPIR-V it does not understand).
 uint32_t ColorSinNan(std::vector<uint32_t>& spirv);
 
+// xdroid360_posicion_invariante. Marks the vertex shader's Position output as Invariant, in place. State of Decay
+// draws characters twice (depth first, then color with depth func EQUAL) with different vertex shaders that both
+// skin the vertex. Mali's compiler optimizes each shader its own way, the two depths differ in the last bits and
+// the EQUAL test fails in flickering patches that show the background. Invariant makes the driver compute the
+// position the same way in every shader. Returns 1 if it added the decoration (0: not a vertex shader, already
+// invariant, or SPIR-V it does not understand).
+uint32_t PosicionInvariante(std::vector<uint32_t>& spirv);
+
 }  // namespace nfsmw::nativo
