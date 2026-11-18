@@ -30,6 +30,7 @@ set(NATIVE_RENDERER_SOURCES
     src/nfsmw_ajustes_graficos.cpp
     src/nfsmw_shader_library.cpp
     src/nfsmw_spirv_precision.cpp
+    src/nfsmw_spirv_sin_nan.cpp
     src/nfsmw_nativo_texturas_pool.cpp
     src/nfsmw_nativo_shaders.cpp
     src/nfsmw_nativo_captura.cpp

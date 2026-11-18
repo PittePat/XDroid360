@@ -43,6 +43,7 @@
 #include "nfsmw_nativo_sincronizacion.h"
 #include "nfsmw_spirv_vulkan11.h"
 #include "nfsmw_spirv_descriptores.h"
+#include "nfsmw_spirv_sin_nan.h"
 
 #include "nfsmw_ajustes_graficos.h"
 #if __has_include("nfsmw_nativo_resplandor_energia_spirv.h") && __has_include("nfsmw_nativo_resplandor_suave_spirv.h")
@@ -383,6 +384,12 @@ REXCVAR_DEFINE_BOOL(nfsmw_nativo_cache_texturas_entre_fotogramas, true, "NFSMW",
 // Four-set packing adapted from victorgbd/NFSMW-Recompiled-Mobile, 3d9358e (GPL-3.0).
 REXCVAR_DEFINE_BOOL(nfsmw_nativo_cuatro_conjuntos, false, "NFSMW",
                     "Forzar cuatro conjuntos de descriptores para comprobar compatibilidad Vulkan")
+    .lifecycle(rex::cvar::Lifecycle::kInitOnly);
+
+REXCVAR_DEFINE_STRING(xdroid360_color_sin_nan, "auto", "NFSMW",
+                      "XDroid360: pixel shaders write 0 instead of a NaN color (nfsmw_spirv_sin_nan.h), as Adreno "
+                      "does by itself. auto = on with Arm's Mali driver and PanVK (State of Decay: flickering pink/"
+                      "black patches on characters); on = every GPU; off = never")
     .lifecycle(rex::cvar::Lifecycle::kInitOnly);
 
 REXCVAR_DEFINE_BOOL(nfsmw_nativo_texturas_bc_cpu, false, "NFSMW",
@@ -2143,6 +2150,15 @@ class DibujosVulkanImpl final : public DibujosVulkan {
       bc1_16_ = (fp.optimalTilingFeatures & requerido) == requerido;
       REXLOG_INFO("[compatibilidad] BC1: {}", bc1_16_ ? "a 16 bits (A1R5G5B5), la mitad que RGBA8"
                                                       : "RGBA8 (el driver no deja muestrear A1R5G5B5)");
+    }
+    // xdroid360_color_sin_nan: Mali keeps a NaN color in the render target where Adreno writes 0.
+    {
+      const std::string modo = REXCVAR_GET(xdroid360_color_sin_nan);
+      const bool mali = propiedades.driverID == VK_DRIVER_ID_ARM_PROPRIETARY ||
+                        propiedades.driverID == VK_DRIVER_ID_MESA_PANVK;
+      color_sin_nan_ = modo == "on" || (modo == "auto" && mali);
+      REXLOG_INFO("[compatibilidad] color NaN a 0 en los pixel shaders: {} (opcion {})",
+                  color_sin_nan_ ? "si" : "no", modo);
     }
     // nfsmw_nativo_abanicos_a_listas. MoltenVK has no triangleFans in its portability subset.
     abanicos_a_listas_ =
@@ -10958,6 +10974,13 @@ class DibujosVulkanImpl final : public DibujosVulkan {
         info.pCode = convertido.data();
       }
     }
+    if (color_sin_nan_) {  // xdroid360_color_sin_nan; leaves vertex shaders untouched
+      if (convertido.empty()) convertido.assign(spirv, spirv + bytes / 4);
+      if (nfsmw::nativo::ColorSinNan(convertido)) {
+        info.codeSize = convertido.size() * sizeof(uint32_t);
+        info.pCode = convertido.data();
+      }
+    }
     if (cuatro_conjuntos_) {
       if (convertido.empty()) convertido.assign(spirv, spirv + bytes / 4);
       if (!nfsmw::spirv::JuntarConjuntos(convertido)) {
@@ -12788,6 +12811,7 @@ class DibujosVulkanImpl final : public DibujosVulkan {
   // PARCHE LOCAL (NFSMW Recompiled): GPU con solo 4 conjuntos de descriptores (CrearDescriptores). Lo que se
   // enlaza de los montones (el de cubos va dentro del 1), cuantos son y en que conjunto van los UBO.
   bool cuatro_conjuntos_ = false;
+  bool color_sin_nan_ = false;  // xdroid360_color_sin_nan (CrearModulo)
   std::array<VkDescriptorSet, 4> sets_enlace_{};
   uint32_t n_sets_enlace_ = 4;
   uint32_t conjunto_ubo_ = 4;
