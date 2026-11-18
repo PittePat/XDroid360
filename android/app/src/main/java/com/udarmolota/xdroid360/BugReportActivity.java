@@ -226,7 +226,13 @@ public class BugReportActivity extends AppCompatActivity {
         try (ZipOutputStream zip = new ZipOutputStream(out)) {
             put(zip, "device.txt", deviceInfo().getBytes(StandardCharsets.UTF_8));
             if (i != null) {
-                put(zip, "instance.txt", (i.name + "\n" + i.buildLabel() + "\ndriver " + i.driver + ", sysmem " + i.sysmem
+                // The profile the game was built from beside the APK's, so a report from a game
+                // not updated after installing a new launcher shows it at once.
+                Recipe bundled = i.bundledProfile(this);
+                String profiles = bundled == null ? ""
+                        : "\nprofile " + i.profileVersion() + ", bundled " + bundled.version()
+                        + (i.newerProfile(this) != null ? " (UPDATE NOT APPLIED)" : "");
+                put(zip, "instance.txt", (i.name + "\n" + i.buildLabel() + profiles + "\ndriver " + i.driver + ", sysmem " + i.sysmem
                         + ", texture LOD " + i.textureLodToUse() + (i.textureLodBias < 0 ? " (default)" : "")
                         + ", display " + i.hudMode + "\n\n"
                         + i.manifest.toString()).getBytes(StandardCharsets.UTF_8));

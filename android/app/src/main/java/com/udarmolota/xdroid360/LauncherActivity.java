@@ -448,6 +448,7 @@ public class LauncherActivity extends AppCompatActivity {
         h.banner.setImageBitmap(null);
         h.settings.setVisibility(View.GONE);
         h.play.setVisibility(View.GONE);
+        h.updateBadge.setVisibility(View.GONE);
         View.OnClickListener open = v -> startActivity(new Intent(this, BuildActivity.class)
                 .putExtra(BuildActivity.EXTRA_JOB, job.id));
         h.banner.setOnClickListener(open);
@@ -461,6 +462,12 @@ public class LauncherActivity extends AppCompatActivity {
         h.itemView.setOnClickListener(null);
         h.name.setText(i.name);
         h.details.setText(i.buildLabel());
+        Recipe newer = i.newerProfile(this);
+        h.updateBadge.setVisibility(newer != null ? View.VISIBLE : View.GONE);
+        if (newer != null) {
+            h.updateBadge.setText(getString(R.string.instance_update_available, newer.version()));
+            h.updateBadge.setOnClickListener(v -> InstanceActions.update(this, i));
+        }
         Bitmap b = banners.get(i.id);
         h.banner.setImageBitmap(b);
         if (b == null) {
@@ -490,7 +497,37 @@ public class LauncherActivity extends AppCompatActivity {
         });
     }
 
+    /**
+     * Starts the game; first, when the APK carries a newer profile than the game was built from,
+     * offers Update game (players miss the card's line and keep playing the old one). Asked once
+     * per new profile: after "Play anyway" only the card's badge stays.
+     */
     private void play(Instance i) {
+        Recipe newer = i.newerProfile(this);
+        String stamp = newer != null ? newer.stamp().toString() : "";
+        if (newer == null || stamp.equals(i.updateSkipped)) {
+            startGame(i);
+            return;
+        }
+        String from = i.profileVersion(), to = newer.version();
+        new MaterialAlertDialogBuilder(this)
+                .setTitle(R.string.instance_update_offer_title)
+                .setMessage(getString(R.string.instance_update_offer_text,
+                        from.isEmpty() || from.equals(to) ? to : from + " → " + to))
+                .setNegativeButton(R.string.instance_play_anyway, (d, w) -> {
+                    i.updateSkipped = stamp;
+                    try {
+                        i.save();
+                    } catch (java.io.IOException e) {
+                        android.util.Log.w("XDroid360", "instance.json: " + e);
+                    }
+                    startGame(i);
+                })
+                .setPositiveButton(R.string.instance_update_go, (d, w) -> InstanceActions.updateNow(this, i))
+                .show();
+    }
+
+    private void startGame(Instance i) {
         startActivity(new Intent(this, GameActivity.class).putExtra(InstanceActivity.EXTRA_ID, i.id));
     }
 
@@ -576,7 +613,7 @@ public class LauncherActivity extends AppCompatActivity {
     }
 
     static final class Holder extends RecyclerView.ViewHolder {
-        final TextView name, details;
+        final TextView name, details, updateBadge;
         final ImageView banner;
         final View play, settings, more;
 
@@ -584,6 +621,7 @@ public class LauncherActivity extends AppCompatActivity {
             super(v);
             name = v.findViewById(R.id.name);
             details = v.findViewById(R.id.details);
+            updateBadge = v.findViewById(R.id.update_badge);
             banner = v.findViewById(R.id.banner);
             play = v.findViewById(R.id.play);
             settings = v.findViewById(R.id.settings);

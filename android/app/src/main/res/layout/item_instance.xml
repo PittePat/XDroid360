@@ -50,6 +50,20 @@
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:textAppearance="?attr/textAppearanceBodySmall" />
+
+                <!-- The APK carries a newer profile than the game was built from (tap: Update game). -->
+                <TextView
+                    android:id="@+id/update_badge"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="4dp"
+                    android:background="@color/dao_red_light"
+                    android:paddingHorizontal="8dp"
+                    android:paddingVertical="2dp"
+                    android:textAppearance="?attr/textAppearanceLabelMedium"
+                    android:textColor="@color/dao_red"
+                    android:textStyle="bold"
+                    android:visibility="gone" />
             </LinearLayout>
 
             <com.google.android.material.button.MaterialButton

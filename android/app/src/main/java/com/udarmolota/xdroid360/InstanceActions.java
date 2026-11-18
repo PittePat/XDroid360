@@ -260,32 +260,47 @@ final class InstanceActions {
      * settings, user data and saves stay (BuildService.finish).
      */
     static void update(Activity a, Instance instance) {
-        BuildJob job = instance.isDev() ? null : BuildJob.load(a, instance.id);
-        if (job == null) {
-            Toast.makeText(a, R.string.instance_update_unavailable, Toast.LENGTH_LONG).show();
-            return;
-        }
-        if (BuildService.busy()) {
-            Toast.makeText(a, R.string.build_busy, Toast.LENGTH_LONG).show();
-            return;
-        }
+        BuildJob job = updateJob(a, instance);
+        if (job == null) return;
         new MaterialAlertDialogBuilder(a)
                 .setTitle(R.string.instance_update)
                 .setMessage(a.getString(R.string.instance_update_text, instance.name))
                 .setNegativeButton(android.R.string.cancel, null)
-                .setPositiveButton(R.string.instance_update_go, (d, w) -> {
-                    job.state = BuildJob.RUNNING;
-                    job.errorCode = job.errorDetail = job.failedStep = "";
-                    try {
-                        job.save(a);
-                    } catch (IOException e) {
-                        Toast.makeText(a, e.toString(), Toast.LENGTH_LONG).show();
-                        return;
-                    }
-                    BuildService.start(a, job.id);
-                    a.startActivity(new Intent(a, BuildActivity.class).putExtra(BuildActivity.EXTRA_JOB, job.id));
-                })
+                .setPositiveButton(R.string.instance_update_go, (d, w) -> startUpdate(a, job))
                 .show();
+    }
+
+    /** Update game without its own question: the player already chose it (the update offer on Play). */
+    static void updateNow(Activity a, Instance instance) {
+        BuildJob job = updateJob(a, instance);
+        if (job != null) startUpdate(a, job);
+    }
+
+    /** The game's build job when it can be updated now; else says why and returns null. */
+    private static BuildJob updateJob(Activity a, Instance instance) {
+        BuildJob job = instance.isDev() ? null : BuildJob.load(a, instance.id);
+        if (job == null) {
+            Toast.makeText(a, R.string.instance_update_unavailable, Toast.LENGTH_LONG).show();
+            return null;
+        }
+        if (BuildService.busy()) {
+            Toast.makeText(a, R.string.build_busy, Toast.LENGTH_LONG).show();
+            return null;
+        }
+        return job;
+    }
+
+    private static void startUpdate(Activity a, BuildJob job) {
+        job.state = BuildJob.RUNNING;
+        job.errorCode = job.errorDetail = job.failedStep = "";
+        try {
+            job.save(a);
+        } catch (IOException e) {
+            Toast.makeText(a, e.toString(), Toast.LENGTH_LONG).show();
+            return;
+        }
+        BuildService.start(a, job.id);
+        a.startActivity(new Intent(a, BuildActivity.class).putExtra(BuildActivity.EXTRA_JOB, job.id));
     }
 
     static void confirmDelete(Activity a, Instance instance, Runnable after) {

@@ -113,6 +113,11 @@ final class Instance {
     static final String RENDERER_XENIA = "xenia", RENDERER_NATIVE = "native";
     /** The player's choice, "" for the game's default (rendererToUse). */
     String renderer = "";
+    /**
+     * The stamp of the profile in the APK the player chose to play past ("Play anyway" when the
+     * launcher offered its update), so the question isn't asked again until a newer one comes.
+     */
+    String updateSkipped = "";
 
     /**
      * Whether the game has the native renderer: the launcher writes the key, and the settings offer
@@ -245,6 +250,32 @@ final class Instance {
         return "build " + commit + (tu instanceof Number ? ", Title Update " + tu : "");
     }
 
+    /** The profile version this game was built from on the phone ("sod-9"), or "" when it wasn't. */
+    String profileVersion() {
+        JSONObject recipe = manifest.optJSONObject("recipe");
+        return recipe != null ? recipe.optString("version") : "";
+    }
+
+    /** The profile this APK carries for this game (built on the phone), or null. */
+    Recipe bundledProfile(Context context) {
+        JSONObject built = manifest.optJSONObject("recipe");
+        if (built == null || isDev()) return null;
+        String game = built.optString("game");
+        for (Recipe r : Toolchain.profiles(context)) if (r.gameId().equals(game)) return r;
+        return null;
+    }
+
+    /**
+     * The profile in this APK when this game was built from another one (another version, kit or
+     * tools: "Update game" rebuilds it) and this APK's tools can build it; else null. Until then
+     * the game keeps running the code of the profile it was built from.
+     */
+    Recipe newerProfile(Context context) {
+        Recipe r = bundledProfile(context);
+        if (r == null || r.stamp().toString().equals(manifest.optJSONObject("recipe").toString())) return null;
+        return Toolchain.mismatch(context, r) == null ? r : null;
+    }
+
     void save() throws IOException {
         JSONObject o = new JSONObject();
         try {
@@ -264,6 +295,7 @@ final class Instance {
             s.put("preset", preset);
             s.put("preset_written", presetWritten);
             s.put("renderer", renderer);
+            s.put("update_skipped", updateSkipped);
             o.put("settings", s);
         } catch (JSONException e) {
             throw new IOException(e);
@@ -311,6 +343,7 @@ final class Instance {
                 preset = s.optString("preset", preset);
                 presetWritten = s.optBoolean("preset_written", presetWritten);
                 renderer = s.optString("renderer", renderer);
+                updateSkipped = s.optString("update_skipped", updateSkipped);
             }
         } catch (IOException | JSONException e) {
             android.util.Log.w("XDroid360", "instance.json of " + id + ": " + e);

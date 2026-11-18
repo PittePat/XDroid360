@@ -11,6 +11,10 @@
     <string name="instance_update">Update game</string>
     <string name="instance_update_text">Rebuilds \"%1$s\" for this version of the launcher. The game files, saves and settings stay; usually about a minute.</string>
     <string name="instance_update_go">Update</string>
+    <string name="instance_update_available">Update available: %1$s</string>
+    <string name="instance_update_offer_title">A game update is available</string>
+    <string name="instance_update_offer_text">%1$s. Update now? Your saves and settings stay.</string>
+    <string name="instance_play_anyway">Play anyway</string>
     <string name="instance_update_unavailable">This game wasn\'t built on this phone: add it again instead.</string>
     <string name="instance_delete">Delete</string>
     <string name="instance_delete_confirm">Delete \"%1$s\"? This can\'t be undone.</string>

@@ -9,6 +9,10 @@
     <string name="instance_update">Обновить игру</string>
     <string name="instance_update_text">Пересобрать «%1$s» под эту версию лаунчера. Файлы игры, сейвы и настройки останутся; обычно около минуты.</string>
     <string name="instance_update_go">Обновить</string>
+    <string name="instance_update_available">Доступно обновление: %1$s</string>
+    <string name="instance_update_offer_title">Доступно обновление игры</string>
+    <string name="instance_update_offer_text">%1$s. Обновить сейчас? Сейвы и настройки останутся.</string>
+    <string name="instance_play_anyway">Играть так</string>
     <string name="instance_update_unavailable">Эта игра собрана не на этом телефоне: добавьте её заново.</string>
     <string name="instance_delete">Удалить</string>
     <string name="instance_delete_confirm">Удалить «%1$s»? Отменить будет нельзя.</string>
