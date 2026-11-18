@@ -62,11 +62,13 @@ final class Instance {
     private static final String[] SOD_LANGUAGES = { "english", "french", "german", "italian", "spanish" };
     /** Dragon Age's languages and the talk table each needs (core_<locale>.tlk). */
     private static final String[][] DAO_TALK_TABLES = {
-            { "english", "en-us" }, { "italian", "it-it" }, { "spanish", "es-es" }, { "russian", "ru-ru" } };
+            { "english", "en-us" }, { "italian", "it-it" }, { "spanish", "es-es" }, { "russian", "ru-ru" },
+            { "german", "de-de" } };
 
     /**
      * This game's languages, for the settings' language card. Dragon Age offers the ones its disc has
-     * text for: English, Italian and Spanish on the usual disc, Russian on the Russian one.
+     * text for: English, Italian and Spanish on the usual disc, Russian on the Russian one, German
+     * on the German one.
      */
     String[] languages() {
         if (SOD_TITLE_ID.equals(titleId())) return SOD_LANGUAGES;
@@ -425,7 +427,7 @@ final class Instance {
     /**
      * The language to start the game in: the chosen one if this game has it, else the phone's
      * when the game has it, else English, else the disc's first (the Russian disc has only
-     * Russian). A Russian phone gets State of Decay's Russian text (played as "french") only when
+     * Russian, the German disc only German). A Russian phone gets State of Decay's Russian text (played as "french") only when
      * it was made on this phone.
      */
     String languageToUse() {

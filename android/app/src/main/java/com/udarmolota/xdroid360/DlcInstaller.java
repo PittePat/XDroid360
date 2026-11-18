@@ -42,12 +42,13 @@ final class DlcInstaller {
     /**
      * The title updates the game is made for, by their default.xexp's SHA-1 (recomp's
      * kernel/title_update.cpp): Title Update 6 and 7 for the English, Italian and Spanish disc,
-     * and Title Update 7 for the Russian one.
+     * and Title Update 7 for the Russian and the German one.
      */
     private static final String[][] KNOWN_UPDATES = {
             { "4141b608e44c4ed35eb4e24ba2c05844a2f57a54", "6" },
             { "dd5b493f4fe2fb4c99e6ef7ed6923ddddeee8291", "7" },
-            { "b97ea0822418c14527298d1474428f13699d5943", "7" } };
+            { "b97ea0822418c14527298d1474428f13699d5943", "7" },
+            { "02eb46494c26195037bf39f49534d9acf270a030", "7" } };
     /** A package's header is 0xA000+ bytes; anything smaller on a disc isn't one. */
     private static final long MIN_PACKAGE = 0xB000;
     /** Enough of a package for the probe to read its header and display name. */
