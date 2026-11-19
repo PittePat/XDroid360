@@ -24,4 +24,12 @@ uint32_t ColorSinNan(std::vector<uint32_t>& spirv);
 // invariant, or SPIR-V it does not understand).
 uint32_t PosicionInvariante(std::vector<uint32_t>& spirv);
 
+// xdroid360_posicion_invariante, second half. Marks every float arithmetic result of the vertex shader `spirv`
+// (add, subtract, multiply, divide, negate, the vector and matrix products, dot) NoContraction, in place: the driver
+// may not fuse a multiply and an add into one fused multiply-add. Invariant alone was not enough on Mali: its
+// compiler fuses differently in the depth pass's shader and in the color pass's, and one ulp of difference fails
+// depth func EQUAL. Xenia's own translator marks all of its arithmetic the same way. Returns how many results were
+// marked (0: not a vertex shader, nothing to mark, or SPIR-V it does not understand).
+uint32_t SinContraccion(std::vector<uint32_t>& spirv);
+
 }  // namespace nfsmw::nativo

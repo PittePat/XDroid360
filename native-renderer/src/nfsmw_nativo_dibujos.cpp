@@ -392,9 +392,9 @@ REXCVAR_DEFINE_STRING(xdroid360_color_sin_nan, "auto", "NFSMW",
                       "black patches on characters); on = every GPU; off = never")
     .lifecycle(rex::cvar::Lifecycle::kInitOnly);
 REXCVAR_DEFINE_STRING(xdroid360_posicion_invariante, "auto", "NFSMW",
-                      "XDroid360: vertex shaders get their Position output marked Invariant "
-                      "(nfsmw_spirv_sin_nan.h), so a depth pass and a depth-EQUAL color pass with different vertex "
-                      "shaders agree bit for bit. auto = on with Arm's Mali driver and PanVK (State of Decay: "
+                      "XDroid360: vertex shaders get their Position output marked Invariant and all their float "
+                      "arithmetic NoContraction (nfsmw_spirv_sin_nan.h), so a depth pass and a depth-EQUAL color "
+                      "pass with different vertex shaders agree bit for bit. auto = on with Arm's Mali driver and PanVK (State of Decay: "
                       "flickering patches on characters that show the background); on = every GPU; off = never")
     .lifecycle(rex::cvar::Lifecycle::kInitOnly);
 
@@ -2167,7 +2167,7 @@ class DibujosVulkanImpl final : public DibujosVulkan {
                   color_sin_nan_ ? "si" : "no", modo);
       const std::string invariante = REXCVAR_GET(xdroid360_posicion_invariante);
       posicion_invariante_ = invariante == "on" || (invariante == "auto" && mali);
-      REXLOG_INFO("[compatibilidad] posicion invariante en los vertex shaders: {} (opcion {})",
+      REXLOG_INFO("[compatibilidad] posicion invariante y sin contraccion en los vertex shaders: {} (opcion {})",
                   posicion_invariante_ ? "si" : "no", invariante);
     }
     // nfsmw_nativo_abanicos_a_listas. MoltenVK has no triangleFans in its portability subset.
@@ -10993,7 +10993,8 @@ class DibujosVulkanImpl final : public DibujosVulkan {
     }
     if (posicion_invariante_) {  // xdroid360_posicion_invariante; leaves pixel shaders untouched
       if (convertido.empty()) convertido.assign(spirv, spirv + bytes / 4);
-      if (nfsmw::nativo::PosicionInvariante(convertido)) {
+      const uint32_t invariante = nfsmw::nativo::PosicionInvariante(convertido);
+      if (nfsmw::nativo::SinContraccion(convertido) || invariante) {
         info.codeSize = convertido.size() * sizeof(uint32_t);
         info.pCode = convertido.data();
       }

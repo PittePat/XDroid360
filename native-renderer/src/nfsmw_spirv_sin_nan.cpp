@@ -233,4 +233,46 @@ uint32_t PosicionInvariante(std::vector<uint32_t>& spirv) {
   return 1;
 }
 
+uint32_t SinContraccion(std::vector<uint32_t>& spirv) {
+  constexpr uint32_t kOpDecorate = 71, kOpTypeVoid = 19, kOpTypeForwardPointer = 39;
+  constexpr uint32_t kOpFNegate = 127, kOpFAdd = 129, kOpFSub = 131, kOpFMul = 133, kOpFDiv = 136, kOpFRem = 140;
+  constexpr uint32_t kOpDot = 148;  // 141-148: FMod, the vector and matrix products, OuterProduct, Dot
+  constexpr uint32_t kDecorationNoContraction = 42;
+  constexpr uint32_t kExecutionModelVertex = 0;
+  if (spirv.size() < 5 || spirv[0] != 0x07230203u || spirv[3] == 0 || spirv[3] > kMaxBound) {
+    return 0;
+  }
+  const uint32_t limite = spirv[3];
+  bool vertices = false;
+  size_t donde_insertar = 0;
+  std::vector<uint8_t> ya(limite, 0);
+  std::vector<uint32_t> decoraciones;
+  for (size_t pos = 5; pos < spirv.size();) {
+    const uint32_t n = spirv[pos] >> 16, op = spirv[pos] & 0xFFFF;
+    if (n == 0 || pos + n > spirv.size()) {
+      return 0;
+    }
+    const uint32_t* w = spirv.data() + pos;
+    if (op == kOpEntryPoint && n >= 2 && w[1] == kExecutionModelVertex) {
+      vertices = true;
+    } else if (op == kOpDecorate && n >= 3 && w[2] == kDecorationNoContraction && w[1] < limite) {
+      ya[w[1]] = 1;
+    } else if (!donde_insertar && op >= kOpTypeVoid && op <= kOpTypeForwardPointer) {
+      donde_insertar = pos;  // the first type: the annotations end right before it
+    } else if (n >= 4 && w[2] < limite && !ya[w[2]] &&
+               (op == kOpFNegate || op == kOpFAdd || op == kOpFSub || op == kOpFMul || op == kOpFDiv ||
+                (op >= kOpFRem && op <= kOpDot))) {
+      ya[w[2]] = 1;  // result type, result id, operands
+      decoraciones.insert(decoraciones.end(), {Palabra(3, kOpDecorate), w[2], kDecorationNoContraction});
+    }
+    pos += n;
+  }
+  if (!vertices || decoraciones.empty() || !donde_insertar) {
+    return 0;
+  }
+  const uint32_t marcados = uint32_t(decoraciones.size() / 3);
+  spirv.insert(spirv.begin() + ptrdiff_t(donde_insertar), decoraciones.begin(), decoraciones.end());
+  return marcados;
+}
+
 }  // namespace nfsmw::nativo
