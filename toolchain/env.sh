@@ -24,8 +24,8 @@ XR_REPO=https://github.com/hedge-dev/XenonRecomp.git
 XR_COMMIT=ddd128bcca99fe8bfbb99bea583c972351fa6ace
 # The XDroid360 games' one recompiler patch script (DAORecomp fork, recomp/scripts).
 XR_PATCH_REPO=udarmolota/Dragon-Age-Origins-Recomp-Android
-XR_PATCH_COMMIT=bfbaa874323181191228ca20a7775f1725ee287a
-XR_PATCH_SHA256=55d637e3157206a8267e25d24823448bc956f2a1955ddbc389a15f511e1812e6
+XR_PATCH_COMMIT=b7bd9be312a2160b03592b5b0177047629c36d45
+XR_PATCH_SHA256=73c9c1bb955d76cd709f0bf510e73694be404a821f6a1ff57d342d2ac7ec9e10
 SDL_REPO=https://github.com/libsdl-org/SDL.git
 SDL_COMMIT=829a65d769d935c4852f8159e964312c0957260a
 NDK_VERSION=27.3.13750724

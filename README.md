@@ -169,8 +169,8 @@ launcher, the native renderer, and the on-phone toolchain in [`toolchain/`](tool
 `libxenonrecomp.so`, is GPL-2.0-or-later as a whole (its disassembler comes from GNU binutils);
 its exact source is [XenonRecomp](https://github.com/hedge-dev/XenonRecomp/tree/ddd128bcca99fe8bfbb99bea583c972351fa6ace)
 at `ddd128b`, patched by
-[`scripts/patch_recompiler.py`](https://github.com/udarmolota/Dragon-Age-Origins-Recomp-Android/blob/bfbaa874323181191228ca20a7775f1725ee287a/scripts/patch_recompiler.py)
-at `bfbaa87`, built by [`toolchain/build_tools.sh`](toolchain/build_tools.sh).
+[`scripts/patch_recompiler.py`](https://github.com/udarmolota/Dragon-Age-Origins-Recomp-Android/blob/b7bd9be312a2160b03592b5b0177047629c36d45/scripts/patch_recompiler.py)
+at `b7bd9be`, built by [`toolchain/build_tools.sh`](toolchain/build_tools.sh).
 
 *Dragon Age* is a trademark of Electronic Arts; *State of Decay* is a trademark of Undead Labs and
 Microsoft. XDroid360 is not affiliated with or endorsed by them.
