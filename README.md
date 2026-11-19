@@ -34,6 +34,11 @@ original.
 > tool: Google (Chrome's download check, Google Drive, Play Protect) and a few antivirus apps may flag
 > or block the APK. Download it from the Releases page here, in Chrome tap **Keep** if it asks (or use
 > another browser), and check the certificate fingerprint above. Don't take it from re-uploads.
+>
+> Want a second opinion? Everything is open: give an AI assistant you trust this repository's link
+> (or the APK) and ask what the app does and why scanners flag it. The APK is built from this code by
+> GitHub's own servers ([Actions](https://github.com/udarmolota/XDroid360/actions)), with the build
+> log public.
 
 ## How to play
 
