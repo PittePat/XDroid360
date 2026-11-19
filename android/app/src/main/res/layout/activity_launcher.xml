@@ -312,11 +312,145 @@
             app:menu="@menu/menu_bottom_nav" />
     </LinearLayout>
 
-    <com.google.android.material.navigation.NavigationView
-        android:id="@+id/nav"
-        android:layout_width="wrap_content"
+    <!-- The drawer: the menu, then a pinned row of links at the bottom (Wiki, GitHub with its
+         new-version dot, Reddit, Support), as in the author's other launchers. -->
+    <LinearLayout
+        android:layout_width="300dp"
         android:layout_height="match_parent"
         android:layout_gravity="start"
-        app:headerLayout="@layout/nav_header"
-        app:menu="@menu/menu_nav" />
+        android:background="?attr/colorSurface"
+        android:orientation="vertical">
+
+        <com.google.android.material.navigation.NavigationView
+            android:id="@+id/nav"
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:layout_weight="1"
+            android:background="@android:color/transparent"
+            app:headerLayout="@layout/nav_header"
+            app:menu="@menu/menu_nav" />
+
+        <View
+            android:layout_width="match_parent"
+            android:layout_height="1dp"
+            android:background="?attr/colorPrimary" />
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:gravity="center"
+            android:orientation="horizontal"
+            android:paddingTop="6dp"
+            android:paddingBottom="6dp">
+
+            <LinearLayout
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:orientation="vertical">
+
+                <ImageButton
+                    android:id="@+id/link_wiki"
+                    android:layout_width="44dp"
+                    android:layout_height="44dp"
+                    android:layout_gravity="center_horizontal"
+                    android:background="?attr/selectableItemBackgroundBorderless"
+                    android:contentDescription="@string/nav_link_wiki"
+                    android:scaleType="centerInside"
+                    android:src="@drawable/ic_wiki"
+                    android:tint="?attr/colorOnSurfaceVariant" />
+
+                <TextView
+                    style="@style/NavLinkLabel"
+                    android:text="@string/nav_link_wiki" />
+            </LinearLayout>
+
+            <LinearLayout
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:orientation="vertical">
+
+                <FrameLayout
+                    android:layout_width="44dp"
+                    android:layout_height="44dp"
+                    android:layout_gravity="center_horizontal">
+
+                    <ImageButton
+                        android:id="@+id/link_github"
+                        android:layout_width="match_parent"
+                        android:layout_height="match_parent"
+                        android:background="?attr/selectableItemBackgroundBorderless"
+                        android:contentDescription="@string/nav_link_github"
+                        android:scaleType="centerInside"
+                        android:src="@drawable/ic_github"
+                        android:tint="?attr/colorOnSurfaceVariant" />
+
+                    <!-- A newer release on GitHub than this launcher (refreshUpdateBadge). -->
+                    <View
+                        android:id="@+id/update_dot"
+                        android:layout_width="9dp"
+                        android:layout_height="9dp"
+                        android:layout_gravity="top|end"
+                        android:layout_marginTop="7dp"
+                        android:layout_marginEnd="7dp"
+                        android:background="@drawable/update_badge_dot"
+                        android:visibility="gone" />
+                </FrameLayout>
+
+                <TextView
+                    style="@style/NavLinkLabel"
+                    android:text="@string/nav_link_github" />
+            </LinearLayout>
+
+            <LinearLayout
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:orientation="vertical">
+
+                <ImageButton
+                    android:id="@+id/link_reddit"
+                    android:layout_width="44dp"
+                    android:layout_height="44dp"
+                    android:layout_gravity="center_horizontal"
+                    android:background="?attr/selectableItemBackgroundBorderless"
+                    android:contentDescription="@string/nav_link_reddit"
+                    android:scaleType="centerInside"
+                    android:src="@drawable/ic_reddit"
+                    android:tint="?attr/colorOnSurfaceVariant" />
+
+                <TextView
+                    style="@style/NavLinkLabel"
+                    android:text="@string/nav_link_reddit" />
+            </LinearLayout>
+
+            <LinearLayout
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:orientation="vertical">
+
+                <ImageButton
+                    android:id="@+id/link_donate"
+                    android:layout_width="44dp"
+                    android:layout_height="44dp"
+                    android:layout_gravity="center_horizontal"
+                    android:background="?attr/selectableItemBackgroundBorderless"
+                    android:contentDescription="@string/nav_link_donate"
+                    android:scaleType="centerInside"
+                    android:src="@drawable/ic_donate"
+                    android:tint="?attr/colorOnSurfaceVariant" />
+
+                <TextView
+                    style="@style/NavLinkLabel"
+                    android:text="@string/nav_link_donate" />
+            </LinearLayout>
+        </LinearLayout>
+
+        <View
+            android:layout_width="match_parent"
+            android:layout_height="1dp"
+            android:background="?attr/colorPrimary" />
+    </LinearLayout>
 </androidx.drawerlayout.widget.DrawerLayout>

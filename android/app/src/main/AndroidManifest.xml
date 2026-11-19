@@ -9,6 +9,8 @@
     <uses-feature android:name="android.hardware.bluetooth" android:required="false" />
 
     <uses-permission android:name="android.permission.VIBRATE" />
+    <!-- Only the GitHub link's check for a newer release (api.github.com), once a day. -->
+    <uses-permission android:name="android.permission.INTERNET" />
     <!-- Building a game on the phone (BuildService): in the foreground, with the screen off. -->
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
@@ -51,6 +53,10 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+        <activity
+            android:name=".WikiActivity"
+            android:theme="@style/LauncherTheme"
+            android:exported="false" />
         <activity
             android:name=".BugReportActivity"
             android:theme="@style/LauncherTheme"

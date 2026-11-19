@@ -44,4 +44,13 @@
         <item name="android:textColor">@color/dao_red_dark</item>
         <item name="android:layout_marginBottom">4dp</item>
     </style>
+    <!-- The caption under each link icon at the drawer's bottom. -->
+    <style name="NavLinkLabel" parent="">
+        <item name="android:layout_width">match_parent</item>
+        <item name="android:layout_height">wrap_content</item>
+        <item name="android:gravity">center_horizontal</item>
+        <item name="android:textSize">10sp</item>
+        <item name="android:textColor">?attr/colorOnSurfaceVariant</item>
+        <item name="android:singleLine">true</item>
+    </style>
 </resources>

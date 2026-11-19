@@ -197,4 +197,56 @@
     <string name="build_error_link_failed">The game library couldn\'t be put together. Send the log in a bug report.</string>
     <string name="build_error_abi_mismatch">The built game doesn\'t fit this launcher version.</string>
     <string name="build_error_cancelled">Cancelled.</string>
+    <!-- The drawer's link row (Wiki, GitHub, Reddit, Support) -->
+    <string name="nav_link_wiki">Wiki</string>
+    <string name="nav_link_github">GitHub</string>
+    <string name="nav_link_reddit">Reddit</string>
+    <string name="nav_link_donate">Support</string>
+    <string name="url_github_releases" translatable="false">https://github.com/udarmolota/XDroid360/releases</string>
+    <string name="url_reddit" translatable="false">https://www.reddit.com/r/UdarMolotaDev/</string>
+    <string name="donate_title">Support development</string>
+    <string name="donate_message">Enjoying XDroid360 and want to support it?\n\nMade and maintained by me: ko-fi.com/udarmolota\n\nEvery bit helps keep the work going. Thank you! ❤</string>
+    <string name="update_title">App version</string>
+    <string name="update_checking">Checking for updates…</string>
+    <string name="update_installed">Installed: %1$s</string>
+    <string name="update_latest">Latest on GitHub: %1$s</string>
+    <string name="update_up_to_date">You\'re up to date.</string>
+    <string name="update_available">A newer version is available.</string>
+    <string name="update_failed">Couldn\'t check the latest version (%1$s).</string>
+    <string name="update_open">Open GitHub</string>
+    <string name="wiki_title">XDroid360 wiki</string>
+    <string name="wiki_text"><![CDATA[
+<h3>Installing a game</h3>
+<p>XDroid360 has no games in it: you add <b>your own copy</b>, and the phone builds it.</p>
+<p>1. Copy the game to the phone: the disc image (<b>.iso</b>, or a <b>.zip</b> with it) for Dragon Age: Origins and Mass Effect; for State of Decay, a .zip of its folder from your console\'s storage.<br>
+2. Tap <b>+</b> and pick the file. The card shows which game it is and the space it needs.<br>
+3. Tap <b>Build</b>. Dragon Age and State of Decay take 5–20 minutes, Mass Effect 30–60. You can lock the phone meanwhile; don\'t swipe the app away.<br>
+4. Tap <b>Play</b>.</p>
+
+<h3>Games and editions</h3>
+<p><b>Dragon Age: Origins</b>: the English/Italian/Spanish disc, disc 1 of the Ultimate Edition, the Russian or the German edition. <b>Mass Effect</b>: its disc image. <b>State of Decay</b>: its folder with the DLC and Title Update 6. The launcher tells you if your edition isn\'t supported yet.</p>
+
+<h3>DLC and title updates (Dragon Age)</h3>
+<p>Open the <b>Import</b> tab, pick Dragon Age, and add your DLC packages (files from a console, a .zip of them, or the Ultimate Edition\'s second disc). Warden\'s Keep, The Stone Prisoner, Return to Ostagar and the armour packs work right away. <b>Awakening</b> and the later campaigns also need <b>Title Update 7</b> for your edition: import it the same way, then run <b>Update game</b>.</p>
+
+<h3>After a launcher update</h3>
+<p>When the launcher brings a newer version of a game, <b>Play</b> asks to update it (a red note shows on its card too). Updating keeps your files, saves and settings. You can also run it from ⋮ → <b>Update game</b>.</p>
+
+<h3>Game settings (⚙ on the card)</h3>
+<p><b>Renderer</b>: Native draws the game directly with Vulkan and is much faster; Xenia (emulated) is the fallback if Native shows something wrong.<br>
+<b>Driver</b>: Automatic uses the built-in Turnip on Adreno 7xx/8xx and the phone\'s own driver elsewhere. You can install another one from the menu.<br>
+<b>Frame rate</b>: 30 is cooler and kinder to the battery; 60 is smoother.<br>
+<b>Texture detail</b>: lower it if the game runs out of memory.</p>
+
+<h3>Controls and saves</h3>
+<p>A Bluetooth or USB gamepad works as is; the on-screen controls hide while one is used. <b>Controls</b> edits the on-screen layout for each game. <b>Export</b> and <b>Import</b> back up and move saves and layouts.</p>
+
+<h3>If something goes wrong</h3>
+<p>• <b>White or black screen</b>: try the other driver (Automatic, Built-in Turnip, System) or the other renderer.<br>
+• <b>Building fails</b>: check the free space the card asked for, then tap Retry; a failed step often passes the second time.<br>
+• <b>Crashes or glitches</b>: send <b>Report a bug</b> from the menu; the logs are attached.</p>
+
+<h3>Antivirus warnings</h3>
+<p>Some scanners (and Chrome\'s download check) flag XDroid360: it carries a compiler that builds the game on your phone. That is a false positive. Download it only from GitHub, and check its certificate fingerprint there.</p>
+]]></string>
 </resources>

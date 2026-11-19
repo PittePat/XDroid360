@@ -137,6 +137,8 @@ public class LauncherActivity extends AppCompatActivity {
             ((TextView) nav.getHeaderView(0).findViewById(R.id.nav_version)).setText(version);
         } catch (Exception ignored) {
         }
+        wireDrawerLinks();
+        maybeDailyUpdateCheck();
 
         empty = findViewById(R.id.empty);
         findViewById(R.id.empty_add).setOnClickListener(v -> addGame());
@@ -591,6 +593,167 @@ public class LauncherActivity extends AppCompatActivity {
     private void build(Uri uri, String pick) {
         startActivity(new Intent(this, BuildActivity.class).putExtra(BuildActivity.EXTRA_URI, uri)
                 .putExtra(BuildActivity.EXTRA_PICK, pick));
+    }
+
+    // ---------------------------------------------------------------- the drawer's link row
+
+    private static final String LINK_PREFS = "launcher_links";
+    private static final String RELEASES_API = "https://api.github.com/repos/udarmolota/XDroid360/releases/latest";
+
+    /** Wiki, GitHub (the version check), Reddit and Support at the drawer's bottom. */
+    private void wireDrawerLinks() {
+        findViewById(R.id.link_wiki).setOnClickListener(v -> {
+            drawer.closeDrawer(GravityCompat.START);
+            startActivity(new Intent(this, WikiActivity.class));
+        });
+        findViewById(R.id.link_github).setOnClickListener(v -> {
+            drawer.closeDrawer(GravityCompat.START);
+            checkForUpdates();
+        });
+        findViewById(R.id.link_reddit).setOnClickListener(v -> {
+            drawer.closeDrawer(GravityCompat.START);
+            openUrl(getString(R.string.url_reddit));
+        });
+        findViewById(R.id.link_donate).setOnClickListener(v -> {
+            drawer.closeDrawer(GravityCompat.START);
+            showLinkDialog(R.string.donate_title, getString(R.string.donate_message));
+        });
+    }
+
+    private void openUrl(String url) {
+        try {
+            startActivity(new Intent(Intent.ACTION_VIEW, Uri.parse(url)));
+        } catch (Exception e) {
+            android.widget.Toast.makeText(this, url, android.widget.Toast.LENGTH_LONG).show();
+        }
+    }
+
+    /** A dialog whose web addresses are links (the Support text). */
+    private void showLinkDialog(int title, String message) {
+        android.text.SpannableString s = new android.text.SpannableString(message);
+        android.text.util.Linkify.addLinks(s, android.text.util.Linkify.WEB_URLS);
+        AlertDialog dialog = new MaterialAlertDialogBuilder(this).setTitle(title).setMessage(s)
+                .setPositiveButton(android.R.string.ok, null).create();
+        dialog.show();
+        TextView messageView = dialog.findViewById(android.R.id.message);
+        if (messageView != null) messageView.setMovementMethod(android.text.method.LinkMovementMethod.getInstance());
+    }
+
+    private String installedVersion() {
+        try {
+            return getPackageManager().getPackageInfo(getPackageName(), 0).versionName;
+        } catch (Exception e) {
+            return "?";
+        }
+    }
+
+    /** The latest release's tag on GitHub, or null with the reason in error[0]. */
+    private static String fetchLatestTag(String[] error) {
+        java.net.HttpURLConnection c = null;
+        try {
+            c = (java.net.HttpURLConnection) new java.net.URL(RELEASES_API).openConnection();
+            c.setRequestProperty("Accept", "application/vnd.github+json");
+            c.setConnectTimeout(8000);
+            c.setReadTimeout(8000);
+            int code = c.getResponseCode();
+            if (code != 200) {
+                error[0] = code == 404 ? "no release yet" : "GitHub " + code;
+                return null;
+            }
+            java.io.ByteArrayOutputStream out = new java.io.ByteArrayOutputStream();
+            try (java.io.InputStream in = c.getInputStream()) {
+                byte[] buf = new byte[8192];
+                for (int n; (n = in.read(buf)) > 0; ) out.write(buf, 0, n);
+            }
+            String tag = new JSONObject(out.toString("UTF-8")).optString("tag_name", "");
+            if (tag.isEmpty()) {
+                error[0] = "no tag";
+                return null;
+            }
+            return tag;
+        } catch (Exception e) {
+            error[0] = e.getClass().getSimpleName();
+            return null;
+        } finally {
+            if (c != null) c.disconnect();
+        }
+    }
+
+    /** GitHub's tap: ask GitHub now and say how the installed version compares. */
+    private void checkForUpdates() {
+        android.widget.Toast.makeText(this, R.string.update_checking, android.widget.Toast.LENGTH_SHORT).show();
+        new Thread(() -> {
+            String[] error = new String[1];
+            String latest = fetchLatestTag(error);
+            if (latest != null) getSharedPreferences(LINK_PREFS, MODE_PRIVATE).edit().putString("latest_tag", latest).apply();
+            ui.post(() -> {
+                refreshUpdateBadge();
+                showUpdateDialog(latest, error[0]);
+            });
+        }, "xdroid360-update-check").start();
+    }
+
+    private void showUpdateDialog(String latest, String error) {
+        if (isFinishing() || isDestroyed()) return;
+        String installed = installedVersion();
+        StringBuilder msg = new StringBuilder(getString(R.string.update_installed, installed));
+        if (latest == null) {
+            msg.append("\n\n").append(getString(R.string.update_failed, error));
+        } else {
+            msg.append('\n').append(getString(R.string.update_latest, latest)).append("\n\n")
+                    .append(getString(compareVersions(latest, installed) > 0 ? R.string.update_available : R.string.update_up_to_date));
+        }
+        new MaterialAlertDialogBuilder(this).setTitle(R.string.update_title).setMessage(msg)
+                .setNegativeButton(android.R.string.cancel, null)
+                .setPositiveButton(R.string.update_open, (d, w) -> openUrl(getString(R.string.url_github_releases)))
+                .show();
+    }
+
+    /** Numeric compare of dotted versions ("0.1.10" > "0.1.3", a leading v ignored): >0 if a is newer. */
+    static int compareVersions(String a, String b) {
+        String[] pa = a.replaceFirst("^[vV]", "").split("[.\\-+ _]");
+        String[] pb = b.replaceFirst("^[vV]", "").split("[.\\-+ _]");
+        for (int i = 0; i < Math.max(pa.length, pb.length); i++) {
+            int x = i < pa.length ? parseIntSafe(pa[i]) : 0;
+            int y = i < pb.length ? parseIntSafe(pb[i]) : 0;
+            if (x != y) return Integer.compare(x, y);
+        }
+        return 0;
+    }
+
+    private static int parseIntSafe(String s) {
+        try {
+            return Integer.parseInt(s.trim());
+        } catch (Exception e) {
+            return 0;
+        }
+    }
+
+    /** The red dot on GitHub's icon: the last tag seen is newer than this launcher. */
+    private void refreshUpdateBadge() {
+        View dot = findViewById(R.id.update_dot);
+        if (dot == null) return;
+        String tag = getSharedPreferences(LINK_PREFS, MODE_PRIVATE).getString("latest_tag", "");
+        dot.setVisibility(!tag.isEmpty() && compareVersions(tag, installedVersion()) > 0 ? View.VISIBLE : View.GONE);
+    }
+
+    /**
+     * Once a day at start, ask GitHub for the latest release, for the dot. The day is recorded
+     * before asking, so a phone offline still tries at most once a day; the tag is compared with
+     * the installed version each time, so the dot goes once the launcher is updated.
+     */
+    private void maybeDailyUpdateCheck() {
+        refreshUpdateBadge();
+        android.content.SharedPreferences prefs = getSharedPreferences(LINK_PREFS, MODE_PRIVATE);
+        String today = new java.text.SimpleDateFormat("yyyyMMdd", java.util.Locale.US).format(new java.util.Date());
+        if (today.equals(prefs.getString("check_day", ""))) return;
+        prefs.edit().putString("check_day", today).apply();
+        new Thread(() -> {
+            String latest = fetchLatestTag(new String[1]);
+            if (latest == null) return;
+            getSharedPreferences(LINK_PREFS, MODE_PRIVATE).edit().putString("latest_tag", latest).apply();
+            ui.post(this::refreshUpdateBadge);
+        }, "xdroid360-daily-update-check").start();
     }
 
     private void showHow() {
