@@ -165,6 +165,10 @@ public class LauncherActivity extends AppCompatActivity {
 
         bottomNav = findViewById(R.id.bottom_nav);
         bottomNav.setOnItemSelectedListener(this::onBottomNav);
+        // The root (fitsSystemWindows) already pads for the system bars; Material's bottom bar
+        // would add the navigation bar's height a second time (a gap under it with 3-button
+        // navigation).
+        androidx.core.view.ViewCompat.setOnApplyWindowInsetsListener(bottomNav, (v, insets) -> insets);
         getOnBackPressedDispatcher().addCallback(this, new androidx.activity.OnBackPressedCallback(true) {
             @Override
             public void handleOnBackPressed() {
