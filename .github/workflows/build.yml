@@ -46,8 +46,15 @@ jobs:
           sudo mkdir -p /mnt/work && sudo chown "$USER" /mnt/work
           df -h / /mnt
 
+      # Ninja from the Android SDK's CMake package, not apt: an outage of Ubuntu's mirrors failed
+      # the whole run at this step (2026-11-19). Only ninja goes on the PATH, not that CMake.
       - name: Install Ninja
-        run: sudo apt-get update -q && sudo apt-get install -y -q ninja-build
+        run: |
+          yes | "$ANDROID_SDK_ROOT/cmdline-tools/latest/bin/sdkmanager" "cmake;3.22.1" > /dev/null
+          mkdir -p "$RUNNER_TEMP/ninja"
+          cp "$ANDROID_SDK_ROOT/cmake/3.22.1/bin/ninja" "$RUNNER_TEMP/ninja/"
+          echo "$RUNNER_TEMP/ninja" >> "$GITHUB_PATH"
+          "$RUNNER_TEMP/ninja/ninja" --version
 
       - name: Install NDK 27.3.13750724
         run: |
