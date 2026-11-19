@@ -3,16 +3,16 @@
   "assets": [
     {
       "repo": "udarmolota/SoDRecomp",
-      "tag": "profile-sod-13",
-      "asset": "xdroid360-profile-sod-13.zip",
-      "sha256": "4f79cd1a214ebb21c7bd1a7ad65827f7893aa163fa53d0ef881e01e761d4e052",
+      "tag": "profile-sod-14",
+      "asset": "xdroid360-profile-sod-14.zip",
+      "sha256": "93bb54d21d78b5ec7665d432aeffdbffb4801c11574c2924ecce6af298042d2e",
       "as": "games/sod.zip"
     },
     {
       "repo": "udarmolota/ME1Recomp",
-      "tag": "profile-me1-4",
-      "asset": "xdroid360-profile-me1-4.zip",
-      "sha256": "f489b6bb53577e8ed737244b61e381a0b5314055e694e5dadb879d5d2373dc36",
+      "tag": "profile-me1-5",
+      "asset": "xdroid360-profile-me1-5.zip",
+      "sha256": "d01deebc6d417c157dd3719092b898065542de70e36d4a22d122527730d52334",
       "as": "games/me1.zip"
     }
   ]
