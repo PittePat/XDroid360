@@ -3,9 +3,9 @@
   "assets": [
     {
       "repo": "udarmolota/SoDRecomp",
-      "tag": "profile-sod-14",
-      "asset": "xdroid360-profile-sod-14.zip",
-      "sha256": "93bb54d21d78b5ec7665d432aeffdbffb4801c11574c2924ecce6af298042d2e",
+      "tag": "profile-sod-15",
+      "asset": "xdroid360-profile-sod-15.zip",
+      "sha256": "981c0e8cd7c4ef5f6f96eaee37a74f70936ab6ef27b291e707d80233bfd73d84",
       "as": "games/sod.zip"
     },
     {
