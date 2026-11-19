@@ -74,7 +74,7 @@ target_link_options(vkdriverhook PRIVATE -Wl,-z,global -Wl,-z,max-page-size=1638
 # queue again, as PR #6 did. Google Drive flagged an APK that carried it; VirusTotal's Google
 # row has flagged builds without it too.
 add_library(xdroid_surface_recovery SHARED surface_recovery.c)
-target_link_libraries(xdroid_surface_recovery PRIVATE dl log)
+target_link_libraries(xdroid_surface_recovery PRIVATE SDL3::SDL3 log)
 target_link_options(xdroid_surface_recovery PRIVATE -Wl,-z,max-page-size=16384)
 
 # ---------------------------------------------------------------- the game library
