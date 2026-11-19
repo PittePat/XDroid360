@@ -48,9 +48,6 @@ public class GameActivity extends SDLActivity {
 
     /** Reconnect Xenia's Vulkan presenter after Android replaces SDL's SurfaceView. */
     private static native boolean nativeRequestSurfaceRecovery();
-    // Off for now with its library (CMakeLists.txt: Google Drive flagged the APK that carried
-    // it); to come back through SDL's own lifecycle path. While off, nothing is scheduled.
-    private static final boolean SURFACE_RECOVERY_ENABLED = false;
 
     private static final int MAX_SURFACE_RECOVERY_ATTEMPTS = 24;
     private final Handler surfaceRecoveryHandler = new Handler(Looper.getMainLooper());
@@ -82,7 +79,7 @@ public class GameActivity extends SDLActivity {
     };
 
     private void scheduleSurfaceRecovery() {
-        if (!SURFACE_RECOVERY_ENABLED || !surfaceRecoveryPending) return;
+        if (!surfaceRecoveryPending) return;
         surfaceRecoveryHandler.removeCallbacks(surfaceRecoveryTask);
         // SDL's Java surfaceChanged() callback updates the native window before
         // the Vulkan presenter is allowed to reconnect.
@@ -93,6 +90,9 @@ public class GameActivity extends SDLActivity {
     @Override
     public void loadLibraries() {
         System.loadLibrary("SDL3");
+        // Tiny launcher-side recovery bridge, independent of libgame.so (which is
+        // generated on the phone and cannot be replaced by a launcher-only APK).
+        System.loadLibrary("xdroid_surface_recovery");
         File packaged = new File(installRoot(this), "libgame.so");
         if (current != null && current.library != null) {
             if (!current.library.isFile()) {

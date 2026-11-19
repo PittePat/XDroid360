@@ -69,12 +69,13 @@ target_link_options(vkdriverhook PRIVATE -Wl,-z,global -Wl,-z,max-page-size=1638
 # ------------------------------------------------------ Android surface recovery
 # Launcher JNI bridge that posts SDL lifecycle events to restore the Vulkan
 # presenter after Android replaces the surface during Home / Recents.
-# Left out for now: Google Drive flagged the 0.1.3 APK that carried it as malware
-# (it finds the loaded libSDL3.so and pushes events into it), and a build without
-# it passed. To be redone through SDL's own lifecycle path (GameActivity).
-# add_library(xdroid_surface_recovery SHARED surface_recovery.c)
-# target_link_libraries(xdroid_surface_recovery PRIVATE dl log)
-# target_link_options(xdroid_surface_recovery PRIVATE -Wl,-z,max-page-size=16384)
+# Back on 2026-11-19 (her choice): SDL's own nativePause/nativeResume didn't bring the picture
+# back (Xenia and Native stayed black on the S25), so the events go straight into SDL's event
+# queue again, as PR #6 did. Google Drive flagged an APK that carried it; VirusTotal's Google
+# row has flagged builds without it too.
+add_library(xdroid_surface_recovery SHARED surface_recovery.c)
+target_link_libraries(xdroid_surface_recovery PRIVATE dl log)
+target_link_options(xdroid_surface_recovery PRIVATE -Wl,-z,max-page-size=16384)
 
 # ---------------------------------------------------------------- the game library
 
