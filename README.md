@@ -1,8 +1,8 @@
 # XDroid360
 
 **XDroid360** is an unofficial, community-developed launcher that runs Xbox 360 games on Android
-phones. Today it plays **Dragon Age: Origins** and **State of Decay**, with a gamepad or the
-on-screen controls. The games' code runs natively on the phone's processor, and a native renderer
+phones. Today it plays **Dragon Age: Origins**, **State of Decay** and **Mass Effect**, with a gamepad
+or the on-screen controls. The games' code runs natively on the phone's processor, and a native renderer
 draws their graphics directly with Vulkan.
 
 > [!NOTE]
@@ -11,7 +11,7 @@ draws their graphics directly with Vulkan.
 > app or is stored here.
 
 > [!WARNING]
-> **XDroid360 is in alpha (0.1.2).** It is developed on a **Snapdragon flagship**, and players run it
+> **XDroid360 is in alpha (0.1.3).** It is developed on a **Snapdragon flagship**, and players run it
 > on Mali phones too. Back up your saves before you play (the **Export** tab at the bottom does
 > that).
 
@@ -28,25 +28,35 @@ You can check it in apps like MT Manager or App Manager. The real XDroid360 also
 as an update: if Android refuses to update your copy with the one from GitHub, your copy is not the
 original.
 
+> [!IMPORTANT]
+> **Antivirus warnings are false positives.** XDroid360 carries a compiler (clang, lld) and a
+> recompiler that build each game's code on your phone, and some scanners don't like that kind of
+> tool: Google (Chrome's download check, Google Drive, Play Protect) and a few antivirus apps may flag
+> or block the APK. Download it from the Releases page here, in Chrome tap **Keep** if it asks (or use
+> another browser), and check the certificate fingerprint above. Don't take it from re-uploads.
+
 ## How to play
 
 1. Install XDroid360 from the [Releases page](https://github.com/udarmolota/XDroid360/releases).
 2. Copy your game to the phone's own storage.
 3. In the launcher, tap **+**, choose the game and pick its file.
 4. Check the card (which game it is, the space it needs) and tap **Build**. Installing takes
-   **5–20 minutes**, *State of Decay* the longest. You can leave the launcher meanwhile: the
-   notification shows the progress.
+   **5–20 minutes** for *Dragon Age: Origins* and *State of Decay*, and **30–60 minutes** for
+   *Mass Effect* (it prepares about 30,000 shaders). You can lock the phone or leave the launcher
+   meanwhile: the notification shows the progress.
 5. Tap **Play**.
 
-After an update of the launcher, use **Update game** (⋮ on the game's card): it rebuilds the game for
-the new version and keeps its files, saves and settings.
+After an update of the launcher, the game asks to be updated when you tap **Play** (or use **Update
+game**, ⋮ on the game's card): it rebuilds the game for the new version and keeps its files, saves and
+settings. Until then it runs the old version.
 
 ## Supported games
 
 | Game | What to add | State |
 |---|---|---|
-| **Dragon Age: Origins** | the Xbox 360 disc image (`.iso`, or a `.zip` with it): the English/Italian/Spanish edition, or disc 1 of the Ultimate Edition | playable; frame rate limit 30, 60 or none |
+| **Dragon Age: Origins** | the Xbox 360 disc image (`.iso`, or a `.zip` with it): the English/Italian/Spanish edition, disc 1 of the Ultimate Edition, the Russian (*Начало*) or the German edition. Then, from the **Import** tab: your DLC packages and Title Update 6 or 7 | playable; frame rate limit 30, 60 or none. DLC such as Warden's Keep and The Stone Prisoner just need importing; **Awakening** and the later campaigns need Title Update 7 too |
 | **State of Decay** | a `.zip` of its folder from a console's storage (`584111E8`), with the game, the DLC **Breakdown** and **Lifeline**, and Title Update 6 | playable at 30 or 60 fps. The DLC get installed; playing them hasn't been checked yet |
+| **Mass Effect** | the Xbox 360 disc image (`.iso`, or a `.zip` with it) | new in 0.1.3: plays with the native renderer only; the first install is long (see above) |
 
 Other editions of a game may use a different version of its code. The launcher checks this when you
 add the game and tells you if your edition isn't supported yet.
@@ -58,14 +68,16 @@ add the game and tells you if your edition isn't supported yet.
 - ✔️ **Native renderer**: the games' graphics drawn directly with Vulkan, with their shaders built on
   the phone from your copy. Xenia's emulation of the console's GPU stays one tap away in the game's
   settings
-- ✔️ **Update game**: rebuilds a game for a new launcher version, keeping its files, saves and settings
+- ✔️ **Update game**: rebuilds a game for a new launcher version, keeping its files, saves and settings;
+  the game asks for it when the launcher brings a newer version
+- ✔️ **DLC and title updates** for *Dragon Age: Origins* from the **Import** tab
 - ✔️ **Game settings**: frame rate limit, game language, texture quality and renderer, for each game
 - ✔️ **On-screen controls with an editor**: move the buttons and sticks; every installed game keeps its
   own layout. Physical gamepads (Bluetooth or USB) work too
 - ✔️ **Import / Export**: saves and the on-screen gamepad layout, to a `.zip` or a small file, for
   another phone or another game card
-- ✔️ **Vulkan drivers**: Turnip for Adreno 8xx is built in; each game can use it, the phone's own
-  driver, or any other driver you install (a `.so`, or an Adreno Tools `.zip`)
+- ✔️ **Vulkan drivers**: Turnip is built in and used by default on Adreno 7xx and 8xx; each game can
+  use it, the phone's own driver, or any other driver you install (a `.so`, or an Adreno Tools `.zip`)
 - ✔️ **Info panel**: off, only FPS, or a full bar with GPU and CPU load, memory, power, temperature
   and an FPS graph
 - ✔️ **Full screen**, with no system bars over the game
@@ -82,22 +94,24 @@ and [ValDroid](https://github.com/udarmolota/ValDroid). A few honest notes:
 
 - **Installing takes time and space.** The phone builds each game itself. *Dragon Age: Origins* needs
   about 8 GB (and about 8 GB more while a `.zip` is unpacked); *State of Decay* about 3 GB (and about
-  2 GB more). The card tells you before anything starts.
+  2 GB more); *Mass Effect* about 9 GB. The card tells you before anything starts.
 - **Phones get hot.** At 60 fps the GPU slows down after some minutes. The 30 fps limit (the game's
   card in the launcher), or a cooler, is much kinder to your hands and your battery.
 - **The first minutes are slower.** The graphics' shaders are prepared once and cached; later sessions
   are smoother.
 - **Text input** (a character's name) is Latin letters only: the games' fonts have no others.
-- *Dragon Age: Origins*: no DLC or title update yet. The text and voices are what your disc has
-  (English, Italian or Spanish).
+- *Dragon Age: Origins*: the text and voices are what your disc has (English, Italian or Spanish;
+  Russian or German on those editions). On the native renderer a white flash can show at the start
+  of a conversation, and eyelashes may look white on the English disc.
 
 ## Device compatibility
 
 | GPU | State |
 |---|---|
 | Adreno 8xx (Snapdragon 8 Elite) | tested on a Galaxy S25 Ultra |
-| Adreno 6xx/7xx | untested |
-| Mali | works: *Dragon Age: Origins* confirmed by players, even on a budget Helio G99 phone |
+| Adreno 7xx (Snapdragon 8 Gen 1 / 8+ Gen 1 / 8 Gen 2) | works, confirmed by players and tested on an ROG Phone 6 |
+| Adreno 6xx | untested |
+| Mali | works: *Dragon Age: Origins* confirmed by players, even on a budget Helio G99 phone; 0.1.3 fixes State of Decay's pink and black patches there |
 | Xclipse, PowerVR | untested |
 
 If you try another phone, a report from **Report a bug** is very welcome.
@@ -120,7 +134,8 @@ The games were made for the Xbox 360's PowerPC processor. When you install one, 
 **statically recompiles** its code: the phone translates the machine code from your copy into C++
 (XenonRecomp) and compiles it for ARM64 (clang and lld, built into the app), in about 5–20 minutes.
 The result runs with the game's runtime: [DAORecomp](https://github.com/96dot/Dragon-Age-Origins-Recomp)
-by 96dot for *Dragon Age: Origins*, and SoDRecomp, derived from it, for *State of Decay*. They stand
+by 96dot for *Dragon Age: Origins*, and SoDRecomp and ME1Recomp, derived from it, for *State of
+Decay* and *Mass Effect*. They stand
 in for the console's system. The graphics go through a native renderer: the game's draw calls are
 turned into Vulkan directly, and its shaders, taken from your copy, are translated on the phone
 (XenosRecomp and DirectXShaderCompiler). Xenia's Vulkan backend, which emulates the console's GPU,
@@ -140,7 +155,7 @@ add a short description of what happened, and send. The logs are attached for yo
 ## Credits & Third-Party Sources
 
 - [DAORecomp](https://github.com/96dot/Dragon-Age-Origins-Recomp) by 96dot: the *Dragon Age: Origins*
-  runtime, and the base of *State of Decay*'s
+  runtime, and the base of *State of Decay*'s and *Mass Effect*'s
 - [XenonRecomp](https://github.com/hedge-dev/XenonRecomp) by hedge-dev: PowerPC → C++ translation
 - [XenosRecomp](https://github.com/hedge-dev/XenosRecomp) by hedge-dev and Microsoft's
   [DirectXShaderCompiler](https://github.com/microsoft/DirectXShaderCompiler): the games' shaders
@@ -164,13 +179,13 @@ games' libraries link it, so those libraries and the APK are GPL-3.0 as a whole.
 
 Everything in the APK is built from public sources: this repository at the release's tag (the
 launcher, the native renderer, and the on-phone toolchain in [`toolchain/`](toolchain)), the
-[DAORecomp fork](https://github.com/udarmolota/Dragon-Age-Origins-Recomp-Android) and
-[SoDRecomp](https://github.com/udarmolota/SoDRecomp). The recompiler the launcher runs,
+[DAORecomp fork](https://github.com/udarmolota/Dragon-Age-Origins-Recomp-Android),
+[SoDRecomp](https://github.com/udarmolota/SoDRecomp) and [ME1Recomp](https://github.com/udarmolota/ME1Recomp). The recompiler the launcher runs,
 `libxenonrecomp.so`, is GPL-2.0-or-later as a whole (its disassembler comes from GNU binutils);
 its exact source is [XenonRecomp](https://github.com/hedge-dev/XenonRecomp/tree/ddd128bcca99fe8bfbb99bea583c972351fa6ace)
 at `ddd128b`, patched by
 [`scripts/patch_recompiler.py`](https://github.com/udarmolota/Dragon-Age-Origins-Recomp-Android/blob/b7bd9be312a2160b03592b5b0177047629c36d45/scripts/patch_recompiler.py)
 at `b7bd9be`, built by [`toolchain/build_tools.sh`](toolchain/build_tools.sh).
 
-*Dragon Age* is a trademark of Electronic Arts; *State of Decay* is a trademark of Undead Labs and
-Microsoft. XDroid360 is not affiliated with or endorsed by them.
+*Dragon Age* and *Mass Effect* are trademarks of Electronic Arts; *State of Decay* is a trademark of
+Undead Labs and Microsoft. XDroid360 is not affiliated with or endorsed by them.
