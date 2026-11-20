@@ -137,7 +137,7 @@ Decay* needs a fast one.
 | Game | Budget (Mali-G57, e.g. Dimensity 6100+, Helio G99) | Mid-range (Mali-G615, Dimensity 7300 / 8300) | Flagship (Snapdragon 8 Gen 2 and newer) |
 |---|---|---|---|
 | *Dragon Age: Origins* | playable | about 60 fps | 60 fps |
-| *Mass Effect* | playable, with some stutters | — | smooth |
+| *Mass Effect* | playable, with some stutters (30 fps for now) | — | smooth (30 fps for now) |
 | *State of Decay* | under 10 fps | 18–55 fps | 40–57 fps (Snapdragon 8 Elite) |
 
 *Mass Effect*'s first install needs the most memory and time (30–60 minutes).
