@@ -39,7 +39,7 @@ RECOMP = ROOT / "recomp"
 LLVM = RECOMP / "tools" / "llvm" / "bin"
 NINJA = RECOMP / "tools" / "ninja" / ("ninja.exe" if os.name == "nt" else "ninja")
 DEFAULT_KIT = ROOT.parent / "SD1" / "toolchain" / "out" / "kit"
-VERSION = "dao-10"
+VERSION = "dao-11"
 TITLE_ID = "454108C0"
 # Linked whole into dao-game, or compiled on the phone: not in dao-deps.
 # libdxbc.a: Xenia's DXBC checksum (AMD, no licence grant) is D3D12-only: the Vulkan build never

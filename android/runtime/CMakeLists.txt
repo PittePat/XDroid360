@@ -94,7 +94,8 @@ endif()
 
 # Everything both front ends share. Not here: input/input.cpp and apu/audio_output.cpp
 # (SDL3: real in the app, a shim in the headless build), the UI overlays (ImGui over the
-# game: keyboard, notices, photo mode, cheats; not ported yet, stubbed by each front end).
+# game: keyboard, notices, photo mode; not ported yet, stubbed by each front end. The cheats'
+# logic (ui/cheats.cpp) is built here; its menu is each front end's: cheats_android.cpp in the app).
 add_library(daodroid-runtime STATIC
     ${DAO_SRC}/kernel/game_build.cpp
     ${DAO_SRC}/kernel/import_stubs.cpp
@@ -124,6 +125,7 @@ add_library(daodroid-runtime STATIC
     ${DAO_SRC}/content/installed.cpp
     ${DAO_SRC}/content/save_backups.cpp
     ${DAO_SRC}/patches/patches.cpp
+    ${DAO_SRC}/ui/cheats.cpp
     ${DAO_SRC}/ui/erf.cpp
     ${DAO_SRC}/ui/menu_movies.cpp
     ${DAO_SRC}/ui/graphics_menu.cpp
@@ -132,6 +134,7 @@ add_library(daodroid-runtime STATIC
     ${DAO_SRC}/log.cpp
     ${DAO_SRC}/hash.cpp
     ${DAO_SRC}/program.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/cheats_hook.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/profiler.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/xenia_host_vulkan.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/native_host.cpp)
@@ -175,7 +178,7 @@ endif()
 # the phone then translates only the title update's code, under the disc's names (sub_...),
 # so the runtime's tu6_sub_ names become those (tu6_names.h, from every tu6_sub_ name in
 # DAORecomp's sources) and its hooks take the title update's addresses.
-file(GLOB_RECURSE DAO_SOURCES_FOR_NAMES ${DAO_SRC}/*.cpp ${DAO_SRC}/*.h)
+file(GLOB_RECURSE DAO_SOURCES_FOR_NAMES ${DAO_SRC}/*.cpp ${DAO_SRC}/*.h ${CMAKE_CURRENT_SOURCE_DIR}/*.cpp)
 set(DAO_TU6_NAMES "")
 foreach(source ${DAO_SOURCES_FOR_NAMES})
     file(STRINGS ${source} lines REGEX "tu6_sub_[0-9A-F]")

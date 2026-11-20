@@ -345,6 +345,141 @@ public class GameActivity extends SDLActivity {
         });
     }
 
+    // The cheats menu (ui/cheats.h, cheats_android.cpp): the game is paused behind this dialog
+    // while it's open. The rows are cheats_android.cpp's Row; the scripts run on the game's
+    // thread, between frames. (From PR #12 by PittePat; texts in strings.xml, a Material dialog.)
+    private static native String nativeCheatsUse(int row, int amount);
+    private static native int nativeCheatsState();
+    private static native void nativeCheatsClosed();
+
+    private androidx.appcompat.app.AlertDialog cheatsDialog;
+
+    private static final int[] CHEAT_NAMES = { R.string.cheat_immortal, R.string.cheat_skills, R.string.cheat_kill,
+            R.string.cheat_gold, R.string.cheat_xp, R.string.cheat_strengthen };
+    private static final int[] CHEAT_NOTES = { R.string.cheat_immortal_note, R.string.cheat_skills_note,
+            R.string.cheat_kill_note, R.string.cheat_gold_note, R.string.cheat_xp_note, R.string.cheat_strengthen_note };
+    private static final String[] GOLD_LABELS = { "1", "10", "100", "1,000" };
+    private static final String[] XP_LABELS = { "1,000", "5,000", "20,000", "100,000" };
+
+    /** The message for what cheats_android.cpp did (its key), in the launcher's language. */
+    private String cheatMessage(String key, int amount) {
+        switch (key) {
+            case "immortal_on": return getString(R.string.cheat_done_immortal_on);
+            case "immortal_off": return getString(R.string.cheat_done_immortal_off);
+            case "skills_on": return getString(R.string.cheat_done_skills_on);
+            case "skills_off": return getString(R.string.cheat_done_skills_off);
+            case "killed": return getString(R.string.cheat_done_killed);
+            case "gold": return getString(R.string.cheat_done_gold, GOLD_LABELS[amount]);
+            case "xp": return getString(R.string.cheat_done_xp, XP_LABELS[amount]);
+            case "strengthened": return getString(R.string.cheat_done_strengthened);
+            default: return key;
+        }
+    }
+
+    @SuppressWarnings("unused") // from native code (cheats_android.cpp)
+    public void showCheats() {
+        runOnUiThread(() -> {
+            if (cheatsDialog != null || isFinishing() || isDestroyed()) {
+                return;
+            }
+            // The game's own theme isn't a Material one: the dialog and its buttons take the launcher's.
+            final android.content.Context ui = new android.view.ContextThemeWrapper(this, R.style.LauncherTheme);
+            final float dp = getResources().getDisplayMetrics().density;
+            final int pad = Math.round(20 * dp);
+            final android.widget.LinearLayout column = new android.widget.LinearLayout(ui);
+            column.setOrientation(android.widget.LinearLayout.VERTICAL);
+            column.setPadding(pad, Math.round(4 * dp), pad, 0);
+
+            final android.widget.Button[] switches = new android.widget.Button[2];
+            final android.os.Handler handler = new android.os.Handler(android.os.Looper.getMainLooper());
+            final Runnable refresh = () -> {
+                int state = nativeCheatsState();
+                switches[0].setText(getString(R.string.cheat_switch, getString(CHEAT_NAMES[0]),
+                        getString((state & 1) != 0 ? R.string.cheat_on : R.string.cheat_off)));
+                switches[1].setText(getString(R.string.cheat_switch, getString(CHEAT_NAMES[1]),
+                        getString((state & 2) != 0 ? R.string.cheat_on : R.string.cheat_off)));
+            };
+            // The game applies a cheat on its next frame: the switches are read a moment after.
+            final java.util.function.BiConsumer<Integer, Integer> use = (row, amount) -> {
+                String done = nativeCheatsUse(row, amount);
+                if (done != null) {
+                    android.widget.Toast.makeText(this, cheatMessage(done, amount), android.widget.Toast.LENGTH_SHORT).show();
+                }
+                handler.postDelayed(refresh, 400);
+            };
+
+            for (int row = 0; row < CHEAT_NAMES.length; row++) {
+                final int r = row;
+                android.widget.TextView note = new android.widget.TextView(ui);
+                note.setText(CHEAT_NOTES[row]);
+                note.setTextSize(12);
+                note.setAlpha(0.7f);
+                if (row == 3 || row == 4) {
+                    android.widget.TextView title = new android.widget.TextView(ui);
+                    title.setText(CHEAT_NAMES[row]);
+                    title.setTextSize(15);
+                    title.setPadding(0, Math.round(10 * dp), 0, 0);
+                    column.addView(title);
+                    column.addView(note);
+                    android.widget.LinearLayout line = new android.widget.LinearLayout(ui);
+                    line.setOrientation(android.widget.LinearLayout.HORIZONTAL);
+                    String[] labels = row == 3 ? GOLD_LABELS : XP_LABELS;
+                    for (int i = 0; i < labels.length; i++) {
+                        final int a = i;
+                        com.google.android.material.button.MaterialButton b = new com.google.android.material.button.MaterialButton(
+                                ui, null, com.google.android.material.R.attr.materialButtonOutlinedStyle);
+                        b.setText("+" + labels[i]);
+                        b.setAllCaps(false);
+                        b.setPadding(0, 0, 0, 0);
+                        b.setOnClickListener(v -> use.accept(r, a));
+                        android.widget.LinearLayout.LayoutParams lp = new android.widget.LinearLayout.LayoutParams(0,
+                                android.view.ViewGroup.LayoutParams.WRAP_CONTENT, 1f);
+                        lp.setMarginEnd(Math.round(4 * dp));
+                        line.addView(b, lp);
+                    }
+                    column.addView(line);
+                } else {
+                    com.google.android.material.button.MaterialButton b = new com.google.android.material.button.MaterialButton(ui);
+                    b.setAllCaps(false);
+                    b.setText(CHEAT_NAMES[row]);
+                    b.setOnClickListener(v -> use.accept(r, 0));
+                    if (row < 2) {
+                        switches[row] = b;
+                    }
+                    android.widget.LinearLayout.LayoutParams lp = new android.widget.LinearLayout.LayoutParams(
+                            android.view.ViewGroup.LayoutParams.MATCH_PARENT, android.view.ViewGroup.LayoutParams.WRAP_CONTENT);
+                    lp.topMargin = Math.round(8 * dp);
+                    column.addView(b, lp);
+                    column.addView(note);
+                }
+            }
+
+            android.widget.ScrollView scroll = new android.widget.ScrollView(ui);
+            scroll.addView(column);
+            cheatsDialog = new com.google.android.material.dialog.MaterialAlertDialogBuilder(ui)
+                    .setTitle(R.string.cheats_title)
+                    .setView(scroll)
+                    .setPositiveButton(R.string.cheats_close, null)
+                    .create();
+            cheatsDialog.setOnDismissListener(d -> {
+                handler.removeCallbacksAndMessages(null);
+                cheatsDialog = null;
+                nativeCheatsClosed();
+            });
+            cheatsDialog.show();
+            refresh.run();
+        });
+    }
+
+    @SuppressWarnings("unused") // from native code (cheats_android.cpp)
+    public void hideCheats() {
+        runOnUiThread(() -> {
+            if (cheatsDialog != null) {
+                cheatsDialog.dismiss();
+            }
+        });
+    }
+
     // The in-game display (Instance.hudMode, as in Zomdroid): the "FPS: XX" counter, or the
     // performance bar (fps, CPU, GPU, RAM, thermal) from the launchers. Both count the frames the
     // game presented. userdata/env.txt DAO_PERF_OVERLAY=0 hides either.

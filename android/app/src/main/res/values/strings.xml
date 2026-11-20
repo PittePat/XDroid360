@@ -249,4 +249,30 @@
 <h3>Antivirus warnings</h3>
 <p>Some scanners (and Chrome\'s download check) flag XDroid360: it carries a compiler that builds the game on your phone. That is a false positive. Download it only from GitHub, and check its certificate fingerprint there.</p>
 ]]></string>
+    <!-- Dragon Age's cheats menu (GameActivity.showCheats, from PR #12 by PittePat) -->
+    <string name="cheats_title">Cheats</string>
+    <string name="cheats_close">Close</string>
+    <string name="cheat_switch">%1$s: %2$s</string>
+    <string name="cheat_on">On</string>
+    <string name="cheat_off">Off</string>
+    <string name="cheat_immortal">Immortal Party</string>
+    <string name="cheat_skills">Win Every Skill Check</string>
+    <string name="cheat_kill">Kill Nearby Enemies</string>
+    <string name="cheat_gold">Add Gold</string>
+    <string name="cheat_xp">Add Experience</string>
+    <string name="cheat_strengthen">Strengthen Party</string>
+    <string name="cheat_immortal_note">The party still takes damage, but no one in it can die.</string>
+    <string name="cheat_skills_note">Persuasion, intimidation and the other skill checks always succeed.</string>
+    <string name="cheat_kill_note">Kills up to 30 enemies the party leader can see, even those the story keeps alive: some fights may not end as they should.</string>
+    <string name="cheat_gold_note">Adds gold to the party\'s purse.</string>
+    <string name="cheat_xp_note">Experience for the whole party, as the game rewards it.</string>
+    <string name="cheat_strengthen_note">Health and mana 1,000, strength and dexterity 50, for everyone in the party. Permanent.</string>
+    <string name="cheat_done_immortal_on">The party can\'t die</string>
+    <string name="cheat_done_immortal_off">The party can die again</string>
+    <string name="cheat_done_skills_on">Every skill check succeeds</string>
+    <string name="cheat_done_skills_off">Skill checks as the game makes them</string>
+    <string name="cheat_done_killed">Enemies in sight killed</string>
+    <string name="cheat_done_gold">Added %1$s gold</string>
+    <string name="cheat_done_xp">Added %1$s XP</string>
+    <string name="cheat_done_strengthened">The party is stronger</string>
 </resources>

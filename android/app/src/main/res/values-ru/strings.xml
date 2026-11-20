@@ -242,4 +242,30 @@
 <h3>Предупреждения антивирусов</h3>
 <p>Некоторые антивирусы (и проверка загрузок в Chrome) ругаются на XDroid360: внутри есть компилятор, который собирает игру на телефоне. Это ложная тревога. Скачивайте приложение только с GitHub и сверяйте там отпечаток сертификата.</p>
 ]]></string>
+    <!-- Меню читов Dragon Age (GameActivity.showCheats, из PR #12 от PittePat) -->
+    <string name="cheats_title">Читы</string>
+    <string name="cheats_close">Закрыть</string>
+    <string name="cheat_switch">%1$s: %2$s</string>
+    <string name="cheat_on">вкл.</string>
+    <string name="cheat_off">выкл.</string>
+    <string name="cheat_immortal">Бессмертная группа</string>
+    <string name="cheat_skills">Все проверки навыков успешны</string>
+    <string name="cheat_kill">Убить врагов рядом</string>
+    <string name="cheat_gold">Добавить золото</string>
+    <string name="cheat_xp">Добавить опыт</string>
+    <string name="cheat_strengthen">Усилить группу</string>
+    <string name="cheat_immortal_note">Группа по-прежнему получает урон, но никто в ней не может умереть.</string>
+    <string name="cheat_skills_note">Убеждение, запугивание и другие проверки навыков всегда успешны.</string>
+    <string name="cheat_kill_note">Убивает до 30 врагов, которых видит лидер группы, даже тех, кого сюжет оставляет в живых: некоторые бои могут закончиться не так, как задумано.</string>
+    <string name="cheat_gold_note">Добавляет золото в кошелёк группы.</string>
+    <string name="cheat_xp_note">Опыт всей группе, как его даёт игра.</string>
+    <string name="cheat_strengthen_note">Здоровье и мана 1000, сила и ловкость 50 для всех в группе. Навсегда.</string>
+    <string name="cheat_done_immortal_on">Группа не может умереть</string>
+    <string name="cheat_done_immortal_off">Группа снова смертна</string>
+    <string name="cheat_done_skills_on">Все проверки навыков успешны</string>
+    <string name="cheat_done_skills_off">Проверки навыков как в игре</string>
+    <string name="cheat_done_killed">Враги в поле зрения убиты</string>
+    <string name="cheat_done_gold">Добавлено золота: %1$s</string>
+    <string name="cheat_done_xp">Добавлено опыта: %1$s</string>
+    <string name="cheat_done_strengthened">Группа стала сильнее</string>
 </resources>
