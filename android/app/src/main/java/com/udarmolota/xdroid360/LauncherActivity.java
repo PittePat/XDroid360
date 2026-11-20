@@ -434,7 +434,43 @@ public class LauncherActivity extends AppCompatActivity {
     @Override
     protected void onResume() {
         super.onResume();
+        askForSharedStorage();
         refresh();
+    }
+
+    private boolean sharedStorageAsked;
+
+    /**
+     * Once per install (until answered): "All files access", so the games' data can live in
+     * /sdcard/XDroid360, shared by every build of the app whatever its package name. "Not now"
+     * keeps the data in the app's own folder; the question comes back only if asked again here.
+     */
+    private void askForSharedStorage() {
+        if (android.os.Build.VERSION.SDK_INT < android.os.Build.VERSION_CODES.R
+                || android.os.Environment.isExternalStorageManager() || sharedStorageAsked) {
+            return;
+        }
+        android.content.SharedPreferences prefs = getSharedPreferences("launcher", MODE_PRIVATE);
+        if (prefs.getBoolean("shared_storage_declined", false)) return;
+        sharedStorageAsked = true;
+        new MaterialAlertDialogBuilder(this)
+                .setTitle("Keep the games' data in /XDroid360?")
+                .setMessage("With \"All files access\", the games, saves and settings live in the folder "
+                        + "XDroid360 on your phone's storage instead of this app's private folder. Every "
+                        + "build of XDroid360 then uses the same data, whatever its package name, and "
+                        + "you can reach it with a file manager.\n\nGames already in this app's own "
+                        + "folder move there. Without the access nothing changes.")
+                .setPositiveButton("Allow", (d, w) -> {
+                    Intent intent = new Intent(android.provider.Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION,
+                            Uri.parse("package:" + getPackageName()));
+                    try {
+                        startActivity(intent);
+                    } catch (RuntimeException e) {
+                        startActivity(new Intent(android.provider.Settings.ACTION_MANAGE_ALL_FILES_ACCESS_PERMISSION));
+                    }
+                })
+                .setNegativeButton("Not now", (d, w) -> prefs.edit().putBoolean("shared_storage_declined", true).apply())
+                .show();
     }
 
     private void refresh() {

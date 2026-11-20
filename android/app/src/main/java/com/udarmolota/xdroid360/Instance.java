@@ -354,12 +354,71 @@ final class Instance {
 
     // ---------------------------------------------------------------- the store
 
-    /** dao/ on the shared storage: the development build's game, and instances/. */
+    /** The public folder the games' data lives in when "All files access" is granted. */
+    static final String SHARED_DIR = "XDroid360/dao";
+
+    private static boolean migrated;
+
+    /**
+     * Where the games' data lives: {@code /sdcard/XDroid360/dao} (the same for every build of
+     * the app, whatever its package name) once "All files access" is granted, else the app's
+     * own folder under Android/data, as before.
+     */
     static File daoRoot(Context context) {
+        File shared = sharedRoot();
+        if (shared != null) {
+            migrateLegacyRoot(context, shared);
+            return shared;
+        }
+        return legacyRoot(context);
+    }
+
+    /** The app's own folder (Android/data/<package>/files/dao, or the private files/dao). */
+    private static File legacyRoot(Context context) {
         File external = context.getExternalFilesDir(null);
         return new File(external != null ? external : context.getFilesDir(), "dao");
     }
 
+    /** True if the data is in the public folder: all builds of the app see the same games. */
+    static boolean usesSharedStorage() {
+        return sharedRoot() != null;
+    }
+
+    /** The public folder, or null where it can't be used (Android 10, or access not granted). */
+    private static File sharedRoot() {
+        if (android.os.Build.VERSION.SDK_INT < android.os.Build.VERSION_CODES.R
+                || !android.os.Environment.isExternalStorageManager()) {
+            return null;
+        }
+        File dir = new File(android.os.Environment.getExternalStorageDirectory(), SHARED_DIR);
+        //noinspection ResultOfMethodCallIgnored
+        dir.mkdirs();
+        return dir.isDirectory() && dir.canWrite() ? dir : null;
+    }
+
+    /**
+     * The first time the public folder is used: what is in the app's own folder moves into it,
+     * if the public one has no games yet (a rename within the same volume, so it takes no
+     * time and no space). Nothing is overwritten.
+     */
+    private static synchronized void migrateLegacyRoot(Context context, File shared) {
+        if (migrated) return;
+        migrated = true;
+        File legacy = legacyRoot(context);
+        File[] entries = legacy.listFiles();
+        if (entries == null || entries.length == 0 || new File(shared, "instances").exists()
+                || new File(shared, "game").exists()) {
+            return;
+        }
+        for (File entry : entries) {
+            File target = new File(shared, entry.getName());
+            if (!target.exists() && !entry.renameTo(target)) {
+                android.util.Log.w("Instance", "Can't move " + entry + " to " + target);
+            }
+        }
+    }
+
+    /** instances/ under it: one folder per installed game. */
     static File instancesRoot(Context context) {
         return new File(daoRoot(context), "instances");
     }
