@@ -115,16 +115,32 @@ and [ValDroid](https://github.com/udarmolota/ValDroid). A few honest notes:
 |---|---|
 | Adreno 8xx (Snapdragon 8 Elite) | tested on a Galaxy S25 Ultra |
 | Adreno 7xx (Snapdragon 8 Gen 1 / 8+ Gen 1 / 8 Gen 2) | works, confirmed by players and tested on an ROG Phone 6 |
-| Adreno 6xx | untested |
-| Mali | works: *Dragon Age: Origins* confirmed by players, even on a budget Helio G99 phone; 0.1.3 fixes State of Decay's pink and black patches there |
-| Xclipse, PowerVR | untested |
+| Adreno 6xx | works from Adreno 640 (Snapdragon 855): *State of Decay* at about 20 fps on a Galaxy S10e. Snapdragon 845 (Adreno 630) and older on their stock driver: no picture on the native renderer |
+| Mali | newer Mali (G57, G77, G610/G615, G7xx) works: *Dragon Age: Origins* and *Mass Effect* play even on budget Mali-G57 phones; 0.1.3 fixes State of Decay's pink and black patches. Older Mali (G51, G52, G71, G72, G76: Helio G85, G90T, G95…) can't run the native renderer |
+| Xclipse | works: *State of Decay* at 20–30 fps on a Galaxy S24+ (Exynos 2400) |
+| PowerVR | untested |
 
 If you try another phone, a report from **Report a bug** is very welcome.
 
 ## System requirements
 
-- **Minimum:** Android 11+, ARM64, Vulkan, 6 GB of RAM, and the free storage above.
-- **Recommended:** a recent Snapdragon flagship with 12 GB of RAM (what it is tested on).
+The games differ a lot: *Dragon Age: Origins* and *Mass Effect* run on budget phones, *State of
+Decay* needs a fast one.
+
+- **Minimum (all games):** Android 11+, ARM64, 6 GB of RAM, the free storage above, and a graphics
+  driver with Vulkan 1.2 (or Vulkan 1.1 with descriptor indexing). In practice: Adreno 640
+  (Snapdragon 855) or newer, Mali-G57 / G77 or newer, Xclipse.
+- **Not supported by the native renderer:** older Mali (G51, G52, G71, G72, G76) and Snapdragon 845
+  or older on the stock driver. The game starts, but the screen stays one colour.
+- **What to expect:**
+
+| Game | Budget (Mali-G57, e.g. Dimensity 6100+, Helio G99) | Mid-range (Mali-G615, Dimensity 7300 / 8300) | Flagship (Snapdragon 8 Gen 2 and newer) |
+|---|---|---|---|
+| *Dragon Age: Origins* | playable | about 60 fps | 60 fps |
+| *Mass Effect* | playable, with some stutters | — | smooth |
+| *State of Decay* | under 10 fps | 18–55 fps | 40–57 fps (Snapdragon 8 Elite) |
+
+*Mass Effect*'s first install needs the most memory and time (30–60 minutes).
 
 ## Getting the best performance
 
