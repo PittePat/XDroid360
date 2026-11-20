@@ -597,7 +597,7 @@ final class Instance {
     void delete(Context context) {
         if (isDev()) {
             // The development build's files share dao/ with the instances: only its own go.
-            for (String name : new String[] { "game", "userdata", "driver", "title_update", "instance.json", "banner.jpg" }) {
+            for (String name : new String[] { "game", "userdata", "driver", "title_update", "mods", "instance.json", "banner.jpg" }) {
                 deleteTree(new File(root, name));
             }
             return;

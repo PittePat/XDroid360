@@ -480,6 +480,18 @@ public class GameActivity extends SDLActivity {
         });
     }
 
+    // The game's "Manage mods": ends the game and opens this game's mods page (the mods are read
+    // when the game starts). From native code (mods_android.cpp).
+    @SuppressWarnings("unused")
+    public void openMods() {
+        if (current == null) return;
+        runOnUiThread(() -> {
+            startActivity(new android.content.Intent(this, ModsActivity.class)
+                    .putExtra(InstanceActivity.EXTRA_ID, current.id));
+            finishAndRemoveTask();
+        });
+    }
+
     // The in-game display (Instance.hudMode, as in Zomdroid): the "FPS: XX" counter, or the
     // performance bar (fps, CPU, GPU, RAM, thermal) from the launchers. Both count the frames the
     // game presented. userdata/env.txt DAO_PERF_OVERLAY=0 hides either.
