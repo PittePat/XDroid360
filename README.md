@@ -61,7 +61,7 @@ settings. Until then it runs the old version.
 |---|---|---|
 | **Dragon Age: Origins** | the Xbox 360 disc image (`.iso`, or a `.zip` with it): the English/Italian/Spanish edition, disc 1 of the Ultimate Edition, the Russian (*Начало*) or the German edition. Then, from the **Import** tab: your DLC packages and Title Update 6 or 7 | playable; frame rate limit 30, 60 or none. DLC such as Warden's Keep and The Stone Prisoner just need importing; **Awakening** and the later campaigns need Title Update 7 too |
 | **State of Decay** | a `.zip` of its folder from a console's storage (`584111E8`), with the game, the DLC **Breakdown** and **Lifeline**, and Title Update 6 | playable at 30 or 60 fps. The DLC get installed; playing them hasn't been checked yet |
-| **Mass Effect** | the Xbox 360 disc image (`.iso`, or a `.zip` with it): for now **the Russian edition only** (`default.xex` version 0.0.0.5) | new in 0.1.3: plays with the native renderer only, at 30 fps for now; the first install is long (see above) |
+| **Mass Effect** | the Xbox 360 disc image (`.iso`, or a `.zip` with it): for now **one edition only**: the English/Spanish disc with `default.xex` version 0.0.0.5 | new in 0.1.3: plays with the native renderer only, at 30 fps for now; the first install is long (see above) |
 
 ### Supported editions
 
@@ -75,7 +75,7 @@ add the game and tells you if your edition isn't supported yet.
 | | German (*Dragon Age - Origins (Germany)*) | `57EF80D8` |
 | | Title updates: 6 and 7 for the English/Italian/Spanish edition; 7 for the Russian and the German | |
 | *State of Decay* (`584111E8`) | the Xbox Live Arcade game from a console's storage, with Title Update 6 and the DLC Breakdown and Lifeline | — |
-| *Mass Effect* (`4D5307E8`) | the Russian edition, `default.xex` 0.0.0.5 | `572BA75D` |
+| *Mass Effect* (`4D5307E8`) | the English/Spanish edition with `default.xex` 0.0.0.5 | `572BA75D` |
 
 Your disc's media ID is in its `default.xex`; if your edition isn't listed, a bug report from the
 launcher (or the edition's name) helps add it.
