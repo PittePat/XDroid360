@@ -54,6 +54,10 @@
             </intent-filter>
         </activity>
         <activity
+            android:name=".ModsActivity"
+            android:theme="@style/LauncherTheme"
+            android:exported="false" />
+        <activity
             android:name=".WikiActivity"
             android:theme="@style/LauncherTheme"
             android:exported="false" />
