@@ -6,27 +6,32 @@
         <item name="android:windowLayoutInDisplayCutoutMode">shortEdges</item>
     </style>
 
-    <!-- The launcher's screens: white, with the poster's red as the accent. -->
-    <style name="LauncherTheme" parent="Theme.Material3.Light.NoActionBar">
+    <!-- The launcher's screens: white (dark in the system's dark theme), with the poster's red as the accent. -->
+    <style name="LauncherTheme" parent="Theme.Material3.DayNight.NoActionBar">
         <item name="colorPrimary">@color/dao_red</item>
-        <item name="colorOnPrimary">@color/dao_white</item>
+        <item name="colorOnPrimary">@color/dao_on_red</item>
         <item name="colorPrimaryContainer">@color/dao_red_light</item>
         <item name="colorOnPrimaryContainer">@color/dao_red_dark</item>
         <item name="colorSecondary">@color/dao_red_dark</item>
-        <item name="colorOnSecondary">@color/dao_white</item>
+        <item name="colorOnSecondary">@color/dao_on_red</item>
         <item name="colorSecondaryContainer">@color/dao_red_light</item>
         <item name="colorOnSecondaryContainer">@color/dao_red_dark</item>
         <item name="colorTertiary">@color/dao_red</item>
-        <item name="android:colorBackground">@color/dao_white</item>
-        <item name="colorSurface">@color/dao_white</item>
+        <item name="android:colorBackground">@color/dao_background</item>
+        <item name="colorSurface">@color/dao_background</item>
+        <item name="colorSurfaceContainerHigh">@color/dao_surface_high</item>
+        <item name="colorSurfaceContainerHighest">@color/dao_surface_highest</item>
+        <item name="colorSurfaceVariant">@color/dao_surface_variant</item>
+        <item name="colorOutline">@color/dao_outline</item>
+        <item name="colorOutlineVariant">@color/dao_outline_variant</item>
         <item name="colorSurfaceContainer">@color/dao_surface</item>
         <item name="colorSurfaceContainerLow">@color/dao_surface</item>
         <item name="colorOnSurface">@color/dao_ink</item>
         <item name="colorOnSurfaceVariant">@color/dao_ink_soft</item>
-        <item name="android:statusBarColor">@color/dao_white</item>
-        <item name="android:windowLightStatusBar">true</item>
-        <item name="android:navigationBarColor">@color/dao_white</item>
-        <item name="android:windowLightNavigationBar">true</item>
+        <item name="android:statusBarColor">@color/dao_background</item>
+        <item name="android:windowLightStatusBar">@bool/light_bars</item>
+        <item name="android:navigationBarColor">@color/dao_background</item>
+        <item name="android:windowLightNavigationBar">@bool/light_bars</item>
     </style>
 
     <!-- The settings screen's cards. -->
