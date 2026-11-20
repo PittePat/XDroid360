@@ -418,6 +418,85 @@ final class Instance {
         }
     }
 
+    // ------------------------------------------------ the game library in the public folder
+
+    private static final java.util.concurrent.atomic.AtomicBoolean syncing =
+            new java.util.concurrent.atomic.AtomicBoolean();
+
+    /**
+     * The built game library (libgame.so) is kept twice when the data is in the public folder:
+     * the copy the game loads stays in the app's internal files (Android doesn't map code from
+     * shared storage), and a copy sits beside the game's other files in
+     * {@code XDroid360/dao/instances/<id>/}, so a file manager reaches it and any other build
+     * of the app finds the game already built. This brings the two in line, in the background:
+     * a library only on one side is copied to the other, and of two different ones the newer
+     * wins. {@code onChanged} runs on the main thread if a library was copied (a game may then
+     * have become complete: the list needs another look).
+     */
+    static void syncLibraries(Context context, Runnable onChanged) {
+        if (!usesSharedStorage() || !syncing.compareAndSet(false, true)) return;
+        final Context app = context.getApplicationContext();
+        new Thread(() -> {
+            boolean changed = false;
+            try {
+                java.util.Set<String> ids = new java.util.TreeSet<>();
+                for (File root : new File[] { instancesRoot(app), new File(app.getFilesDir(), "instances") }) {
+                    File[] dirs = root.listFiles();
+                    if (dirs == null) continue;
+                    for (File d : dirs) {
+                        if (d.isDirectory()) ids.add(d.getName());
+                    }
+                }
+                for (String id : ids) {
+                    changed |= syncLibrary(app, id);
+                }
+            } catch (IOException | RuntimeException e) {
+                android.util.Log.w("Instance", "Library sync: " + e);
+            } finally {
+                syncing.set(false);
+            }
+            if (changed) {
+                new android.os.Handler(android.os.Looper.getMainLooper()).post(onChanged);
+            }
+        }, "library-sync").start();
+    }
+
+    private static boolean syncLibrary(Context app, String id) throws IOException {
+        File shared = new File(new File(instancesRoot(app), id), "libgame.so");
+        // Only a complete game: its instance.json is in the public folder.
+        if (!new File(shared.getParentFile(), "instance.json").isFile()) return false;
+        File internal = libraryFor(app, id);
+        if (internal.isFile() && !shared.isFile()) {
+            copyLibrary(internal, shared);
+            return true;
+        }
+        if (!internal.isFile() && shared.isFile()) {
+            copyLibrary(shared, internal);
+            return true;
+        }
+        if (!internal.isFile()) return false;
+        if (internal.length() == shared.length() && Math.abs(internal.lastModified() - shared.lastModified()) < 2000) {
+            return false;
+        }
+        if (shared.lastModified() > internal.lastModified()) {
+            copyLibrary(shared, internal);
+        } else {
+            copyLibrary(internal, shared);
+        }
+        return true;
+    }
+
+    /** Copies through a temporary file, so a library is never half there; keeps its time. */
+    private static void copyLibrary(File from, File to) throws IOException {
+        //noinspection ResultOfMethodCallIgnored
+        to.getParentFile().mkdirs();
+        File tmp = new File(to.getPath() + ".tmp");
+        Files.copy(from.toPath(), tmp.toPath(), java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+        //noinspection ResultOfMethodCallIgnored
+        tmp.setLastModified(from.lastModified());
+        Files.move(tmp.toPath(), to.toPath(), java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+    }
+
     /** instances/ under it: one folder per installed game. */
     static File instancesRoot(Context context) {
         return new File(daoRoot(context), "instances");

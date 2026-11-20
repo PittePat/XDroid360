@@ -436,6 +436,8 @@ public class LauncherActivity extends AppCompatActivity {
         super.onResume();
         askForSharedStorage();
         refresh();
+        // The built games' libraries, in line with the public folder's copies (in the background).
+        Instance.syncLibraries(this, this::refresh);
     }
 
     private boolean sharedStorageAsked;
