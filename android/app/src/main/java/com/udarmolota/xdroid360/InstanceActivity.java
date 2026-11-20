@@ -42,6 +42,7 @@ public class InstanceActivity extends AppCompatActivity {
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
+        Appearance.apply(this);
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_instance);
         instance = Instance.open(this, getIntent().getStringExtra(EXTRA_ID));
