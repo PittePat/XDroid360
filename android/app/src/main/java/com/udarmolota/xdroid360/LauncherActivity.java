@@ -113,6 +113,7 @@ public class LauncherActivity extends AppCompatActivity {
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
+        Appearance.apply(this);
         super.onCreate(savedInstanceState);
         if (savedInstanceState != null) { // a picker's target, if Android restarted the launcher meanwhile
             pickForId = savedInstanceState.getString("pick_for");
@@ -582,6 +583,7 @@ public class LauncherActivity extends AppCompatActivity {
         else if (id == R.id.nav_driver) InstanceActions.choose(this, R.string.nav_install_driver, instances,
                 i -> pick(i, PICK_DRIVER));
         else if (id == R.id.nav_bug) bugReport(instances.isEmpty() ? null : instances.get(0));
+        else if (id == R.id.nav_theme) Appearance.showDialog(this);
         else if (id == R.id.nav_about) showAbout();
         else return false;
         return true;

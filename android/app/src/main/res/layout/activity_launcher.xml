@@ -19,7 +19,7 @@
             app:logo="@drawable/dao_logo_small"
             app:navigationIcon="@drawable/ic_menu"
             app:title="@string/app_name"
-            app:titleTextColor="@color/dao_red" />
+            app:titleTextColor="?attr/colorPrimary" />
 
         <!-- The tabs of the bottom bar: home (the games), import/export (one screen for both,
              LauncherActivity.showTransfer), the other projects. -->
@@ -60,7 +60,7 @@
                         android:layout_height="wrap_content"
                         android:text="@string/launcher_empty_title"
                         android:textAppearance="?attr/textAppearanceTitleLarge"
-                        android:textColor="@color/dao_red" />
+                        android:textColor="?attr/colorPrimary" />
 
                     <TextView
                         android:layout_width="match_parent"
@@ -269,7 +269,7 @@
                             android:layout_height="32dp"
                             android:importantForAccessibility="no"
                             android:src="@drawable/ic_reddit"
-                            app:tint="@color/dao_red" />
+                            app:tint="?attr/colorPrimary" />
 
                         <LinearLayout
                             android:layout_width="0dp"

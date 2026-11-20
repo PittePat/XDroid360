@@ -54,7 +54,7 @@
                             android:layout_width="match_parent"
                             android:layout_height="wrap_content"
                             android:textAppearance="?attr/textAppearanceTitleLarge"
-                            android:textColor="@color/dao_red_dark" />
+                            android:textColor="?attr/colorOnPrimaryContainer" />
 
                         <TextView
                             android:id="@+id/details"
@@ -62,7 +62,7 @@
                             android:layout_height="wrap_content"
                             android:layout_marginTop="4dp"
                             android:textAppearance="?attr/textAppearanceBodySmall"
-                            android:textColor="@color/dao_ink" />
+                            android:textColor="?attr/colorOnSurface" />
                     </LinearLayout>
                 </FrameLayout>
             </com.google.android.material.card.MaterialCardView>
@@ -432,7 +432,7 @@
                             android:layout_height="24dp"
                             android:contentDescription="@null"
                             android:src="@drawable/ic_expand"
-                            app:tint="@color/dao_red_dark" />
+                            app:tint="?attr/colorOnPrimaryContainer" />
                     </LinearLayout>
 
                     <LinearLayout
