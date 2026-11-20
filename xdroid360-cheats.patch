@@ -1,0 +1,413 @@
+diff -ruN a/android/app/src/main/cpp/CMakeLists.txt b/android/app/src/main/cpp/CMakeLists.txt
+--- a/android/app/src/main/cpp/CMakeLists.txt	2026-11-19 16:34:14.000000000 +0000
++++ b/android/app/src/main/cpp/CMakeLists.txt	2026-11-20 10:09:44.717881977 +0000
+@@ -91,6 +91,7 @@
+     sdl_window.cpp
+     virtual_pad_jni.cpp
+     keyboard_android.cpp
++    cheats_android.cpp
+     vulkan_private_loader.c
+     xdroid360_note.c)
+ if (NOT XDROID360_PROFILE_BUILD) # the profile build has no generated code to link the game with
+diff -ruN a/android/app/src/main/cpp/app_stubs.cpp b/android/app/src/main/cpp/app_stubs.cpp
+--- a/android/app/src/main/cpp/app_stubs.cpp	2026-11-19 16:34:14.000000000 +0000
++++ b/android/app/src/main/cpp/app_stubs.cpp	2026-11-20 10:09:44.717423076 +0000
+@@ -13,14 +13,10 @@
+ 
+ namespace dao::ui
+ {
+-    // The START menu's movie (Photo Mode and Cheats rows; their actions are no-ops here),
++    // The START menu's movie (Photo Mode and Cheats rows; Photo Mode's action is a no-op here, the cheats are cheats.cpp's),
+     // as photo_mode.cpp installs it on Windows.
+     void InitializePhotoMode() { InstallPauseMenuMovie(); }
+     void TogglePhotoMode() {}
+-    void ToggleCheats() {}
+-    bool CheatsAvailable() { return false; }
+-    bool CheatsOpen() { return false; }
+-    uint16_t CheatsFilterButtons(uint16_t buttons) { return buttons; }
+     uint16_t PhotoModeFilterButtons(uint16_t buttons) { return buttons; }
+     void ShowNotice(std::string text) { LOGW("Notice: {}", text); }
+ 
+diff -ruN a/android/app/src/main/cpp/cheats_android.cpp b/android/app/src/main/cpp/cheats_android.cpp
+--- a/android/app/src/main/cpp/cheats_android.cpp	1970-01-01 00:00:00.000000000 +0000
++++ b/android/app/src/main/cpp/cheats_android.cpp	2026-11-20 10:10:15.872593809 +0000
+@@ -0,0 +1,140 @@
++// The cheats menu (ui/cheats.h) as an Android dialog: cheats.cpp opens it (ShowOverlay)
++// over the paused game and runs the scripts asked for; the player taps a cheat in
++// GameActivity.showCheats, which calls nativeCheatsUse here. On Windows DAORecomp draws
++// this menu itself with ImGui over the game window (ui/cheats_overlay.cpp); the rows and
++// scripts below are that file's, on a phone's touch screen.
++#include "stdafx.h"
++
++#include <jni.h>
++
++#include <SDL3/SDL_system.h>
++
++#include "ui/cheats.h"
++
++namespace
++{
++    using dao::ui::cheats::Scope;
++
++    // The rows, as cheats_overlay.cpp's Row (GameActivity.showCheats uses the same numbers).
++    enum Row
++    {
++        kImmortal = 0,
++        kSkillChecks,
++        kKillEnemies,
++        kGold,
++        kExperience,
++        kStrengthen,
++    };
++
++    // The amounts the buttons of the Gold and Experience rows add.
++    constexpr int kGoldAmounts[] = { 1, 10, 100, 1000 };
++    constexpr int kExperienceAmounts[] = { 1000, 5000, 20000, 100000 };
++    // Coppers in a gold coin (zz_money's value is in coppers).
++    constexpr int kCoppersPerGold = 10000;
++
++    std::string Grouped(int value)
++    {
++        std::string digits = std::to_string(value);
++        for (int at = int(digits.size()) - 3; at > 0; at -= 3)
++            digits.insert(size_t(at), ",");
++        return digits;
++    }
++
++    // Calls a method of GameActivity with no arguments (the game's thread; the UI thread
++    // does the dialog's work).
++    void CallActivity(const char* method)
++    {
++        auto* env = static_cast<JNIEnv*>(SDL_GetAndroidJNIEnv());
++        auto activity = static_cast<jobject>(SDL_GetAndroidActivity());
++        if (!env || !activity)
++        {
++            LOGW("Cheats: no activity for {}", method);
++            return;
++        }
++        jclass cls = env->GetObjectClass(activity);
++        if (jmethodID id = env->GetMethodID(cls, method, "()V"))
++            env->CallVoidMethod(activity, id);
++        else
++        {
++            env->ExceptionClear();
++            LOGW("Cheats: GameActivity.{} missing", method);
++        }
++        env->DeleteLocalRef(cls);
++        env->DeleteLocalRef(activity);
++    }
++}
++
++namespace dao::ui::cheats
++{
++    void ShowOverlay()
++    {
++        CallActivity("showCheats");
++    }
++
++    void CloseOverlay()
++    {
++        CallActivity("hideCheats");
++    }
++}
++
++// The row the player tapped (`amount`: which of the Gold and Experience buttons). Returns the
++// message to show, or null if nothing was asked for.
++extern "C" JNIEXPORT jstring JNICALL Java_com_udarmolota_xdroid360_GameActivity_nativeCheatsUse(
++    JNIEnv* env, jclass, jint row, jint amount)
++{
++    using namespace dao::ui::cheats;
++    const State state = GetState();
++    std::string toast;
++    switch (row)
++    {
++    case kImmortal:
++        // (The script switches its creature's: it runs for those that aren't yet, or back
++        // for those it made immortal.)
++        Run("pc_immortal", {}, state.immortal ? Scope::MadeImmortal : Scope::EachMortal);
++        toast = state.immortal ? "The party can die again" : "The party can't die";
++        break;
++    case kSkillChecks:
++        Run("zz_override_skills", state.skillChecks ? "0" : "1");
++        toast = state.skillChecks ? "Skill checks as the game makes them" : "Every skill check succeeds";
++        break;
++    case kKillEnemies:
++        Run("killallhostiles");
++        toast = "Enemies in sight killed";
++        break;
++    case kGold:
++        if (amount < 0 || amount >= int(std::size(kGoldAmounts)))
++            return nullptr;
++        Run("zz_money", std::to_string(kGoldAmounts[amount] * kCoppersPerGold));
++        toast = "Added " + Grouped(kGoldAmounts[amount]) + " gold";
++        break;
++    case kExperience:
++        if (amount < 0 || amount >= int(std::size(kExperienceAmounts)))
++            return nullptr;
++        Run("addxp", std::to_string(kExperienceAmounts[amount]));
++        toast = "Added " + Grouped(kExperienceAmounts[amount]) + " XP";
++        break;
++    case kStrengthen:
++        // (The script finds the creature it strengthens by its tag.)
++        Run("zz_supercrit", {}, Scope::EachTag);
++        toast = "The party is stronger";
++        break;
++    default:
++        return nullptr;
++    }
++    return env->NewStringUTF(toast.c_str());
++}
++
++// The game's state the dialog shows: bit 0 the party is immortal, bit 1 every skill check
++// succeeds (as of the game's last frame with the menu open).
++extern "C" JNIEXPORT jint JNICALL Java_com_udarmolota_xdroid360_GameActivity_nativeCheatsState(JNIEnv*, jclass)
++{
++    const dao::ui::cheats::State state = dao::ui::cheats::GetState();
++    return (state.immortal ? 1 : 0) | (state.skillChecks ? 2 : 0);
++}
++
++// The player closed the dialog (Back, a tap outside it, Close): the menu closes with it.
++extern "C" JNIEXPORT void JNICALL Java_com_udarmolota_xdroid360_GameActivity_nativeCheatsClosed(JNIEnv*, jclass)
++{
++    if (dao::ui::CheatsOpen())
++        dao::ui::ToggleCheats();
++}
+diff -ruN a/android/app/src/main/java/com/udarmolota/xdroid360/GameActivity.java b/android/app/src/main/java/com/udarmolota/xdroid360/GameActivity.java
+--- a/android/app/src/main/java/com/udarmolota/xdroid360/GameActivity.java	2026-11-19 16:34:14.000000000 +0000
++++ b/android/app/src/main/java/com/udarmolota/xdroid360/GameActivity.java	2026-11-20 10:10:15.882217063 +0000
+@@ -345,6 +345,120 @@
+         });
+     }
+ 
++    // The cheats menu (ui/cheats.h, cheats_android.cpp): the game is paused behind this dialog
++    // while it's open. The rows are cheats_android.cpp's Row; the scripts run on the game's
++    // thread, between frames.
++    private static native String nativeCheatsUse(int row, int amount);
++    private static native int nativeCheatsState();
++    private static native void nativeCheatsClosed();
++
++    private android.app.AlertDialog cheatsDialog;
++
++    private static final String[] CHEAT_NAMES = { "Immortal Party", "Win Every Skill Check", "Kill Nearby Enemies",
++            "Add Gold", "Add Experience", "Strengthen Party" };
++    private static final String[] CHEAT_NOTES = {
++            "The party still takes damage, but no one in it can die.",
++            "Persuasion, intimidation and the other skill checks always succeed.",
++            "Kills up to 30 enemies the party leader can see, even those the story keeps alive: some fights may not end as they should.",
++            "Adds gold to the party's purse.",
++            "Experience for the whole party, as the game rewards it.",
++            "Health and mana 1,000, strength and dexterity 50, for everyone in the party. Permanent." };
++    private static final String[] GOLD_LABELS = { "1", "10", "100", "1,000" };
++    private static final String[] XP_LABELS = { "1,000", "5,000", "20,000", "100,000" };
++
++    @SuppressWarnings("unused") // from native code (cheats_android.cpp)
++    public void showCheats() {
++        runOnUiThread(() -> {
++            if (cheatsDialog != null) {
++                return;
++            }
++            final float dp = getResources().getDisplayMetrics().density;
++            final int pad = Math.round(16 * dp);
++            final android.widget.LinearLayout column = new android.widget.LinearLayout(this);
++            column.setOrientation(android.widget.LinearLayout.VERTICAL);
++            column.setPadding(pad, Math.round(4 * dp), pad, 0);
++
++            final android.widget.Button[] switches = new android.widget.Button[2];
++            final android.os.Handler handler = new android.os.Handler(android.os.Looper.getMainLooper());
++            final Runnable refresh = () -> {
++                int state = nativeCheatsState();
++                switches[0].setText(CHEAT_NAMES[0] + ": " + ((state & 1) != 0 ? "On" : "Off"));
++                switches[1].setText(CHEAT_NAMES[1] + ": " + ((state & 2) != 0 ? "On" : "Off"));
++            };
++            // The game applies a cheat on its next frame: the switches are read a moment after.
++            final java.util.function.BiConsumer<Integer, Integer> use = (row, amount) -> {
++                String toast = nativeCheatsUse(row, amount);
++                if (toast != null) {
++                    android.widget.Toast.makeText(this, toast, android.widget.Toast.LENGTH_SHORT).show();
++                }
++                handler.postDelayed(refresh, 400);
++            };
++
++            for (int row = 0; row < CHEAT_NAMES.length; row++) {
++                final int r = row;
++                android.widget.TextView note = new android.widget.TextView(this);
++                note.setText(CHEAT_NOTES[row]);
++                note.setTextSize(12);
++                note.setAlpha(0.7f);
++                if (row == 3 || row == 4) {
++                    android.widget.TextView title = new android.widget.TextView(this);
++                    title.setText(CHEAT_NAMES[row]);
++                    title.setTextSize(15);
++                    title.setPadding(0, Math.round(8 * dp), 0, 0);
++                    column.addView(title);
++                    column.addView(note);
++                    android.widget.LinearLayout line = new android.widget.LinearLayout(this);
++                    line.setOrientation(android.widget.LinearLayout.HORIZONTAL);
++                    String[] labels = row == 3 ? GOLD_LABELS : XP_LABELS;
++                    for (int i = 0; i < labels.length; i++) {
++                        final int a = i;
++                        android.widget.Button b = new android.widget.Button(this);
++                        b.setText("+" + labels[i]);
++                        b.setAllCaps(false);
++                        b.setOnClickListener(v -> use.accept(r, a));
++                        line.addView(b, new android.widget.LinearLayout.LayoutParams(0,
++                                android.view.ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
++                    }
++                    column.addView(line);
++                } else {
++                    android.widget.Button b = new android.widget.Button(this);
++                    b.setAllCaps(false);
++                    b.setText(CHEAT_NAMES[row]);
++                    b.setOnClickListener(v -> use.accept(r, 0));
++                    if (row < 2) {
++                        switches[row] = b;
++                    }
++                    column.addView(b);
++                    column.addView(note);
++                }
++            }
++
++            android.widget.ScrollView scroll = new android.widget.ScrollView(this);
++            scroll.addView(column);
++            cheatsDialog = new android.app.AlertDialog.Builder(this, android.R.style.Theme_DeviceDefault_Dialog_Alert)
++                    .setTitle("Cheats")
++                    .setView(scroll)
++                    .setPositiveButton("Close", null)
++                    .create();
++            cheatsDialog.setOnDismissListener(d -> {
++                handler.removeCallbacksAndMessages(null);
++                cheatsDialog = null;
++                nativeCheatsClosed();
++            });
++            cheatsDialog.show();
++            refresh.run();
++        });
++    }
++
++    @SuppressWarnings("unused") // from native code (cheats_android.cpp)
++    public void hideCheats() {
++        runOnUiThread(() -> {
++            if (cheatsDialog != null) {
++                cheatsDialog.dismiss();
++            }
++        });
++    }
++
+     // The in-game display (Instance.hudMode, as in Zomdroid): the "FPS: XX" counter, or the
+     // performance bar (fps, CPU, GPU, RAM, thermal) from the launchers. Both count the frames the
+     // game presented. userdata/env.txt DAO_PERF_OVERLAY=0 hides either.
+diff -ruN a/android/runtime/CMakeLists.txt b/android/runtime/CMakeLists.txt
+--- a/android/runtime/CMakeLists.txt	2026-11-19 16:34:14.000000000 +0000
++++ b/android/runtime/CMakeLists.txt	2026-11-20 10:09:44.717042798 +0000
+@@ -94,7 +94,8 @@
+ 
+ # Everything both front ends share. Not here: input/input.cpp and apu/audio_output.cpp
+ # (SDL3: real in the app, a shim in the headless build), the UI overlays (ImGui over the
+-# game: keyboard, notices, photo mode, cheats; not ported yet, stubbed by each front end).
++# game: keyboard, notices, photo mode; not ported yet, stubbed by each front end. The cheats'
++# logic (ui/cheats.cpp) is built here; its menu is each front end's: cheats_android.cpp in the app).
+ add_library(daodroid-runtime STATIC
+     ${DAO_SRC}/kernel/game_build.cpp
+     ${DAO_SRC}/kernel/import_stubs.cpp
+@@ -124,6 +125,7 @@
+     ${DAO_SRC}/content/installed.cpp
+     ${DAO_SRC}/content/save_backups.cpp
+     ${DAO_SRC}/patches/patches.cpp
++    ${DAO_SRC}/ui/cheats.cpp
+     ${DAO_SRC}/ui/erf.cpp
+     ${DAO_SRC}/ui/menu_movies.cpp
+     ${DAO_SRC}/ui/graphics_menu.cpp
+@@ -132,6 +134,7 @@
+     ${DAO_SRC}/log.cpp
+     ${DAO_SRC}/hash.cpp
+     ${DAO_SRC}/program.cpp
++    ${CMAKE_CURRENT_SOURCE_DIR}/cheats_hook.cpp
+     ${CMAKE_CURRENT_SOURCE_DIR}/profiler.cpp
+     ${CMAKE_CURRENT_SOURCE_DIR}/xenia_host_vulkan.cpp
+     ${CMAKE_CURRENT_SOURCE_DIR}/native_host.cpp)
+@@ -175,7 +178,7 @@
+ # the phone then translates only the title update's code, under the disc's names (sub_...),
+ # so the runtime's tu6_sub_ names become those (tu6_names.h, from every tu6_sub_ name in
+ # DAORecomp's sources) and its hooks take the title update's addresses.
+-file(GLOB_RECURSE DAO_SOURCES_FOR_NAMES ${DAO_SRC}/*.cpp ${DAO_SRC}/*.h)
++file(GLOB_RECURSE DAO_SOURCES_FOR_NAMES ${DAO_SRC}/*.cpp ${DAO_SRC}/*.h ${CMAKE_CURRENT_SOURCE_DIR}/*.cpp)
+ set(DAO_TU6_NAMES "")
+ foreach(source ${DAO_SOURCES_FOR_NAMES})
+     file(STRINGS ${source} lines REGEX "tu6_sub_[0-9A-F]")
+diff -ruN a/android/runtime/cheats_hook.cpp b/android/runtime/cheats_hook.cpp
+--- a/android/runtime/cheats_hook.cpp	1970-01-01 00:00:00.000000000 +0000
++++ b/android/runtime/cheats_hook.cpp	2026-11-20 10:09:44.681328206 +0000
+@@ -0,0 +1,35 @@
++// Cheats on Android: the game's mode controller update calls UpdateCheats (ui/cheats.cpp),
++// which opens and closes the cheats menu and runs its scripts on the game's thread, between
++// frames. On Windows this call sits in photo_mode.cpp's hook of the same function; photo
++// mode is not built here, so this is its minimal counterpart. If photo mode is ported later,
++// delete this file and keep photo_mode.cpp's hook (one hook per function).
++#include "stdafx.h"
++#include "ui/cheats.h"
++#include "kernel/function.h"
++#include "kernel/game_build.h"
++#include "kernel/game_modes.h"
++
++namespace
++{
++    using namespace dao::kernel;
++
++    // The game (a pointer), as photo_mode.cpp has it.
++    constexpr GameAddress kGame{ 0x83211BB0, 0x832E20E8 };
++
++    int32_t CurrentMode(uint8_t* base, uint32_t controller)
++    {
++        const uint32_t current = PPC_LOAD_U32(controller + kCurrentModeOffset);
++        return current ? int32_t(PPC_LOAD_U32(current + kModeNumberOffset)) : -1;
++    }
++
++    // The mode controller's update: r3 is the controller.
++    void CheatsModeUpdateHook(PPCContext& ctx, uint8_t* base, PPCFunc* original)
++    {
++        const uint32_t controller = ctx.r3.u32;
++        const uint32_t game = PPC_LOAD_U32(kGame.Get());
++        dao::ui::UpdateCheats(base, CurrentMode(base, controller), game);
++        original(ctx, base);
++    }
++}
++
++GAME_HOOK(sub_82317138, tu6_sub_82348590, CheatsModeUpdateHook)
+diff -ruN a/android/runtime/stubs.cpp b/android/runtime/stubs.cpp
+--- a/android/runtime/stubs.cpp	2026-11-19 16:34:14.000000000 +0000
++++ b/android/runtime/stubs.cpp	2026-11-20 10:09:44.717696584 +0000
+@@ -18,15 +18,11 @@
+ 
+ namespace dao::ui
+ {
+-    // The START menu's movie (Photo Mode and Cheats rows; their actions are no-ops here),
++    // The START menu's movie (Photo Mode and Cheats rows; Photo Mode's action is a no-op here, the cheats are cheats.cpp's),
+     // as photo_mode.cpp installs it on Windows.
+     void InitializePhotoMode() { InstallPauseMenuMovie(); }
+     void TogglePhotoMode() {}
+-    void ToggleCheats() {}
+-    bool CheatsAvailable() { return false; }
+     bool KeyboardHoldsInput() { return false; }
+-    bool CheatsOpen() { return false; }
+-    uint16_t CheatsFilterButtons(uint16_t buttons) { return buttons; }
+     uint16_t PhotoModeFilterButtons(uint16_t buttons) { return buttons; }
+     void ShowNotice(std::string text) { LOGW("Notice: {}", text); }
+ 
+@@ -38,6 +34,17 @@
+     }
+ }
+ 
++namespace dao::ui::cheats
++{
++    // No screen to show the menu on: closed again, as cheats_overlay.cpp does without a window.
++    void ShowOverlay()
++    {
++        LOGW("Cheats: headless, closing");
++        ToggleCheats();
++    }
++    void CloseOverlay() {}
++}
++
+ // (Input is the real input/input.cpp over shim/SDL3/SDL.h: no gamepad, but DAO_INPUT_SCRIPT.)
+ 
+ // ------------------------------------------------------------------ launcher (none)

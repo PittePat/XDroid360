@@ -345,6 +345,120 @@ public class GameActivity extends SDLActivity {
         });
     }
 
+    // The cheats menu (ui/cheats.h, cheats_android.cpp): the game is paused behind this dialog
+    // while it's open. The rows are cheats_android.cpp's Row; the scripts run on the game's
+    // thread, between frames.
+    private static native String nativeCheatsUse(int row, int amount);
+    private static native int nativeCheatsState();
+    private static native void nativeCheatsClosed();
+
+    private android.app.AlertDialog cheatsDialog;
+
+    private static final String[] CHEAT_NAMES = { "Immortal Party", "Win Every Skill Check", "Kill Nearby Enemies",
+            "Add Gold", "Add Experience", "Strengthen Party" };
+    private static final String[] CHEAT_NOTES = {
+            "The party still takes damage, but no one in it can die.",
+            "Persuasion, intimidation and the other skill checks always succeed.",
+            "Kills up to 30 enemies the party leader can see, even those the story keeps alive: some fights may not end as they should.",
+            "Adds gold to the party's purse.",
+            "Experience for the whole party, as the game rewards it.",
+            "Health and mana 1,000, strength and dexterity 50, for everyone in the party. Permanent." };
+    private static final String[] GOLD_LABELS = { "1", "10", "100", "1,000" };
+    private static final String[] XP_LABELS = { "1,000", "5,000", "20,000", "100,000" };
+
+    @SuppressWarnings("unused") // from native code (cheats_android.cpp)
+    public void showCheats() {
+        runOnUiThread(() -> {
+            if (cheatsDialog != null) {
+                return;
+            }
+            final float dp = getResources().getDisplayMetrics().density;
+            final int pad = Math.round(16 * dp);
+            final android.widget.LinearLayout column = new android.widget.LinearLayout(this);
+            column.setOrientation(android.widget.LinearLayout.VERTICAL);
+            column.setPadding(pad, Math.round(4 * dp), pad, 0);
+
+            final android.widget.Button[] switches = new android.widget.Button[2];
+            final android.os.Handler handler = new android.os.Handler(android.os.Looper.getMainLooper());
+            final Runnable refresh = () -> {
+                int state = nativeCheatsState();
+                switches[0].setText(CHEAT_NAMES[0] + ": " + ((state & 1) != 0 ? "On" : "Off"));
+                switches[1].setText(CHEAT_NAMES[1] + ": " + ((state & 2) != 0 ? "On" : "Off"));
+            };
+            // The game applies a cheat on its next frame: the switches are read a moment after.
+            final java.util.function.BiConsumer<Integer, Integer> use = (row, amount) -> {
+                String toast = nativeCheatsUse(row, amount);
+                if (toast != null) {
+                    android.widget.Toast.makeText(this, toast, android.widget.Toast.LENGTH_SHORT).show();
+                }
+                handler.postDelayed(refresh, 400);
+            };
+
+            for (int row = 0; row < CHEAT_NAMES.length; row++) {
+                final int r = row;
+                android.widget.TextView note = new android.widget.TextView(this);
+                note.setText(CHEAT_NOTES[row]);
+                note.setTextSize(12);
+                note.setAlpha(0.7f);
+                if (row == 3 || row == 4) {
+                    android.widget.TextView title = new android.widget.TextView(this);
+                    title.setText(CHEAT_NAMES[row]);
+                    title.setTextSize(15);
+                    title.setPadding(0, Math.round(8 * dp), 0, 0);
+                    column.addView(title);
+                    column.addView(note);
+                    android.widget.LinearLayout line = new android.widget.LinearLayout(this);
+                    line.setOrientation(android.widget.LinearLayout.HORIZONTAL);
+                    String[] labels = row == 3 ? GOLD_LABELS : XP_LABELS;
+                    for (int i = 0; i < labels.length; i++) {
+                        final int a = i;
+                        android.widget.Button b = new android.widget.Button(this);
+                        b.setText("+" + labels[i]);
+                        b.setAllCaps(false);
+                        b.setOnClickListener(v -> use.accept(r, a));
+                        line.addView(b, new android.widget.LinearLayout.LayoutParams(0,
+                                android.view.ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
+                    }
+                    column.addView(line);
+                } else {
+                    android.widget.Button b = new android.widget.Button(this);
+                    b.setAllCaps(false);
+                    b.setText(CHEAT_NAMES[row]);
+                    b.setOnClickListener(v -> use.accept(r, 0));
+                    if (row < 2) {
+                        switches[row] = b;
+                    }
+                    column.addView(b);
+                    column.addView(note);
+                }
+            }
+
+            android.widget.ScrollView scroll = new android.widget.ScrollView(this);
+            scroll.addView(column);
+            cheatsDialog = new android.app.AlertDialog.Builder(this, android.R.style.Theme_DeviceDefault_Dialog_Alert)
+                    .setTitle("Cheats")
+                    .setView(scroll)
+                    .setPositiveButton("Close", null)
+                    .create();
+            cheatsDialog.setOnDismissListener(d -> {
+                handler.removeCallbacksAndMessages(null);
+                cheatsDialog = null;
+                nativeCheatsClosed();
+            });
+            cheatsDialog.show();
+            refresh.run();
+        });
+    }
+
+    @SuppressWarnings("unused") // from native code (cheats_android.cpp)
+    public void hideCheats() {
+        runOnUiThread(() -> {
+            if (cheatsDialog != null) {
+                cheatsDialog.dismiss();
+            }
+        });
+    }
+
     // The in-game display (Instance.hudMode, as in Zomdroid): the "FPS: XX" counter, or the
     // performance bar (fps, CPU, GPU, RAM, thermal) from the launchers. Both count the frames the
     // game presented. userdata/env.txt DAO_PERF_OVERLAY=0 hides either.

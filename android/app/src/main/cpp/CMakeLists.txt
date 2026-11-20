@@ -91,6 +91,7 @@ set(DAO_FRONT_SOURCES
     sdl_window.cpp
     virtual_pad_jni.cpp
     keyboard_android.cpp
+    cheats_android.cpp
     vulkan_private_loader.c
     xdroid360_note.c)
 if (NOT XDROID360_PROFILE_BUILD) # the profile build has no generated code to link the game with

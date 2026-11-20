@@ -18,15 +18,11 @@
 
 namespace dao::ui
 {
-    // The START menu's movie (Photo Mode and Cheats rows; their actions are no-ops here),
+    // The START menu's movie (Photo Mode and Cheats rows; Photo Mode's action is a no-op here, the cheats are cheats.cpp's),
     // as photo_mode.cpp installs it on Windows.
     void InitializePhotoMode() { InstallPauseMenuMovie(); }
     void TogglePhotoMode() {}
-    void ToggleCheats() {}
-    bool CheatsAvailable() { return false; }
     bool KeyboardHoldsInput() { return false; }
-    bool CheatsOpen() { return false; }
-    uint16_t CheatsFilterButtons(uint16_t buttons) { return buttons; }
     uint16_t PhotoModeFilterButtons(uint16_t buttons) { return buttons; }
     void ShowNotice(std::string text) { LOGW("Notice: {}", text); }
 
@@ -36,6 +32,17 @@ namespace dao::ui
         LOGI("Keyboard: headless, answering with the default text");
         return request.text;
     }
+}
+
+namespace dao::ui::cheats
+{
+    // No screen to show the menu on: closed again, as cheats_overlay.cpp does without a window.
+    void ShowOverlay()
+    {
+        LOGW("Cheats: headless, closing");
+        ToggleCheats();
+    }
+    void CloseOverlay() {}
 }
 
 // (Input is the real input/input.cpp over shim/SDL3/SDL.h: no gamepad, but DAO_INPUT_SCRIPT.)

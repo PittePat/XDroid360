@@ -13,14 +13,10 @@
 
 namespace dao::ui
 {
-    // The START menu's movie (Photo Mode and Cheats rows; their actions are no-ops here),
+    // The START menu's movie (Photo Mode and Cheats rows; Photo Mode's action is a no-op here, the cheats are cheats.cpp's),
     // as photo_mode.cpp installs it on Windows.
     void InitializePhotoMode() { InstallPauseMenuMovie(); }
     void TogglePhotoMode() {}
-    void ToggleCheats() {}
-    bool CheatsAvailable() { return false; }
-    bool CheatsOpen() { return false; }
-    uint16_t CheatsFilterButtons(uint16_t buttons) { return buttons; }
     uint16_t PhotoModeFilterButtons(uint16_t buttons) { return buttons; }
     void ShowNotice(std::string text) { LOGW("Notice: {}", text); }
 
