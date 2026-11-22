@@ -295,6 +295,11 @@
     <string name="cheat_gold_note">Adds gold to the party\'s purse.</string>
     <string name="cheat_xp_note">Experience for the whole party, as the game rewards it.</string>
     <string name="cheat_strengthen_note">Health and mana 1,000, strength and dexterity 50, for everyone in the party. Permanent.</string>
+    <string name="cheat_ability">Add Ability (by ID)</string>
+    <string name="cheat_ability_note">Gives the character you control an ability by its id. 4020 is the Rogue\'s hidden ability: with it a mage or warrior can pick locks and disarm traps. Permanent: save first.</string>
+    <string name="cheat_ability_hint">Ability ID</string>
+    <string name="cheat_ability_add">Add</string>
+    <string name="cheat_done_ability">Ability %1$d added to the character you control</string>
     <string name="cheat_done_immortal_on">The party can\'t die</string>
     <string name="cheat_done_immortal_off">The party can die again</string>
     <string name="cheat_done_skills_on">Every skill check succeeds</string>
