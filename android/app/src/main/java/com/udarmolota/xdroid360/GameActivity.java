@@ -372,6 +372,7 @@ public class GameActivity extends SDLActivity {
             case "gold": return getString(R.string.cheat_done_gold, GOLD_LABELS[amount]);
             case "xp": return getString(R.string.cheat_done_xp, XP_LABELS[amount]);
             case "strengthened": return getString(R.string.cheat_done_strengthened);
+            case "ability": return getString(R.string.cheat_done_ability, amount);
             default: return key;
         }
     }
@@ -453,6 +454,39 @@ public class GameActivity extends SDLActivity {
                     column.addView(note);
                 }
             }
+
+            // Add Ability: a talent, spell or skill by its id (abi_base), for the character you control.
+            android.widget.TextView abilityTitle = new android.widget.TextView(ui);
+            abilityTitle.setText(R.string.cheat_ability);
+            abilityTitle.setTextSize(15);
+            abilityTitle.setPadding(0, Math.round(10 * dp), 0, 0);
+            column.addView(abilityTitle);
+            android.widget.TextView abilityNote = new android.widget.TextView(ui);
+            abilityNote.setText(R.string.cheat_ability_note);
+            abilityNote.setTextSize(12);
+            abilityNote.setAlpha(0.7f);
+            column.addView(abilityNote);
+            android.widget.LinearLayout abilityLine = new android.widget.LinearLayout(ui);
+            abilityLine.setOrientation(android.widget.LinearLayout.HORIZONTAL);
+            final android.widget.EditText abilityId = new android.widget.EditText(ui);
+            abilityId.setHint(R.string.cheat_ability_hint);
+            abilityId.setInputType(android.text.InputType.TYPE_CLASS_NUMBER);
+            abilityId.setText("4020");
+            abilityLine.addView(abilityId, new android.widget.LinearLayout.LayoutParams(0,
+                    android.view.ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
+            com.google.android.material.button.MaterialButton abilityAdd = new com.google.android.material.button.MaterialButton(
+                    ui, null, com.google.android.material.R.attr.materialButtonOutlinedStyle);
+            abilityAdd.setText(R.string.cheat_ability_add);
+            abilityAdd.setAllCaps(false);
+            abilityAdd.setOnClickListener(v -> {
+                try {
+                    use.accept(6, Integer.parseInt(abilityId.getText().toString().trim()));
+                } catch (NumberFormatException e) {
+                    android.widget.Toast.makeText(this, R.string.cheat_ability_hint, android.widget.Toast.LENGTH_SHORT).show();
+                }
+            });
+            abilityLine.addView(abilityAdd);
+            column.addView(abilityLine);
 
             android.widget.ScrollView scroll = new android.widget.ScrollView(ui);
             scroll.addView(column);

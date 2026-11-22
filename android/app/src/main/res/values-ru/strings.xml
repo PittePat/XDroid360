@@ -260,6 +260,11 @@
     <string name="cheat_gold_note">Добавляет золото в кошелёк группы.</string>
     <string name="cheat_xp_note">Опыт всей группе, как его даёт игра.</string>
     <string name="cheat_strengthen_note">Здоровье и мана 1000, сила и ловкость 50 для всех в группе. Навсегда.</string>
+    <string name="cheat_ability">Добавить способность (по ID)</string>
+    <string name="cheat_ability_note">Даёт управляемому персонажу способность по её ID. 4020 — скрытая способность разбойника: с ней маг или воин может взламывать замки и обезвреживать ловушки. Необратимо: сначала сохраните игру.</string>
+    <string name="cheat_ability_hint">ID способности</string>
+    <string name="cheat_ability_add">Добавить</string>
+    <string name="cheat_done_ability">Способность %1$d добавлена управляемому персонажу</string>
     <string name="cheat_done_immortal_on">Группа не может умереть</string>
     <string name="cheat_done_immortal_off">Группа снова смертна</string>
     <string name="cheat_done_skills_on">Все проверки навыков успешны</string>
