@@ -1,0 +1,52 @@
+diff --git a/DAORecomp/gpu/video.cpp b/DAORecomp/gpu/video.cpp
+index 89e82be..d94508b 100644
+--- a/DAORecomp/gpu/video.cpp
++++ b/DAORecomp/gpu/video.cpp
+@@ -457,3 +457,15 @@ static void SceneTilesHook(PPCContext& ctx, uint8_t* base, PPCFunc* original)
+     }
+ }
+ GAME_HOOK(sub_82661640, tu6_sub_826955E8, SceneTilesHook)
++
++// Mid-asm hook placed by config/DAO.toml (0x8265E304) and config/DAO_tu6.toml (0x826922A4), in
++// the engine's display-size selection. The game ignores the width XGetVideoMode returns and
++// stores 1280x720 itself: r11 is the width and r10 the height about to be stored. With a
++// wider display mode set (SetDisplayMode, e.g. 1600x720) the width is replaced, so the
++// device and the render targets follow it.
++void DaoDisplayWidthMidAsmHook(PPCRegister& r11, PPCRegister& r10)
++{
++    const uint32_t width = dao::gpu::g_video.displayWidth;
++    if (width > 1280 && r10.u32 == 720)
++        r11.u64 = width;
++}
+diff --git a/config/DAO.toml b/config/DAO.toml
+index bd93b73..f9f5a55 100644
+--- a/config/DAO.toml
++++ b/config/DAO.toml
+@@ -74,3 +74,12 @@ invalid_instructions = [
+     { data = 0x8312A1A4, size = 8 }, # __C_specific_handler record
+     { data = 0x00485645, size = 0x13C }, # data block at the end of .text (0x8312AA48-0x8312AB84)
+ ]
++
++# Widescreen (experimental): sub_8265E290 picks the display size the engine builds its device
++# and render targets from: 1280x720 (or 640x480 without HD), whatever XGetVideoMode reports.
++# Both paths meet at 0x8265E304 (stw r11, 0(r29): width; r10: height). The hook replaces the
++# width when the launcher reports a wider display (gpu/video.h SetDisplayMode).
++[[midasm_hook]]
++name = "DaoDisplayWidthMidAsmHook"
++address = 0x8265E304
++registers = ["r11", "r10"]
+diff --git a/config/DAO_tu6.toml b/config/DAO_tu6.toml
+index 5c2dfa8..6275d4e 100644
+--- a/config/DAO_tu6.toml
++++ b/config/DAO_tu6.toml
+@@ -79,3 +79,10 @@ invalid_instructions = [
+     { data = 0x831F408C, size = 8 }, # __C_specific_handler record
+     { data = 0x00485645, size = 0x13C }, # data block at the end of .text (0x831F4930-0x831F4A6C)
+ ]
++
++# Widescreen (experimental): the same place as in DAO.toml (0x8265E304 there), in the
++# title update's code; see DaoDisplayWidthMidAsmHook in DAORecomp/gpu/video.cpp.
++[[midasm_hook]]
++name = "DaoDisplayWidthMidAsmHook"
++address = 0x826922A4
++registers = ["r11", "r10"]
