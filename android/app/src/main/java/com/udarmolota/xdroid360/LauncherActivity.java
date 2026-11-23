@@ -191,8 +191,7 @@ public class LauncherActivity extends AppCompatActivity {
 
     private com.google.android.material.bottomnavigation.BottomNavigationView bottomNav;
     private boolean projectsFilled;
-    /** The Import/Export tab's mode and game. */
-    private boolean transferExport;
+    /** The game the Import/Export tab works on. */
     private Instance transferFor;
 
     private boolean onBottomNav(MenuItem item) {
@@ -206,10 +205,9 @@ public class LauncherActivity extends AppCompatActivity {
         View home = findViewById(R.id.home_pane), transfer = findViewById(R.id.transfer_pane),
                 projects = findViewById(R.id.projects_pane);
         home.setVisibility(id == R.id.tab_home ? View.VISIBLE : View.GONE);
-        transfer.setVisibility(id == R.id.tab_import || id == R.id.tab_export ? View.VISIBLE : View.GONE);
+        transfer.setVisibility(id == R.id.tab_transfer ? View.VISIBLE : View.GONE);
         projects.setVisibility(id == R.id.tab_projects ? View.VISIBLE : View.GONE);
-        if (id == R.id.tab_import || id == R.id.tab_export) {
-            transferExport = id == R.id.tab_export;
+        if (id == R.id.tab_transfer) {
             bindTransfer();
         } else if (id == R.id.tab_projects && !projectsFilled) {
             ProjectsPane.fill(this, findViewById(R.id.projects_reddit), findViewById(R.id.projects_list));
@@ -218,7 +216,7 @@ public class LauncherActivity extends AppCompatActivity {
         return true;
     }
 
-    /** Import or Export: the game (one radio button each), then its saves and its pad layout. */
+    /** Import/Export: the game (a drop-down list), then its saves, its pad layout and, for Dragon Age, its DLC and mods. */
     private void bindTransfer() {
         boolean none = instances.isEmpty();
         findViewById(R.id.transfer_none).setVisibility(none ? View.VISIBLE : View.GONE);
@@ -227,6 +225,7 @@ public class LauncherActivity extends AppCompatActivity {
         }
         if (none) {
             findViewById(R.id.transfer_dlc_card).setVisibility(View.GONE);
+            findViewById(R.id.transfer_mods_card).setVisibility(View.GONE);
             return;
         }
         // Which game: a drop-down list. With one game it is chosen; with several none is until the
@@ -268,30 +267,27 @@ public class LauncherActivity extends AppCompatActivity {
             pickDlc.launch(new String[] { "*/*" });
         });
 
-        ((TextView) findViewById(R.id.transfer_saves_hint)).setText(
-                transferExport ? R.string.transfer_saves_export_hint : R.string.transfer_saves_import_hint);
-        ((TextView) findViewById(R.id.transfer_pad_hint)).setText(
-                transferExport ? R.string.transfer_pad_export_hint : R.string.transfer_pad_import_hint);
-        int button = transferExport ? R.string.transfer_export_button : R.string.transfer_import_button;
-        ((TextView) findViewById(R.id.transfer_saves)).setText(button);
-        ((TextView) findViewById(R.id.transfer_pad)).setText(button);
-        findViewById(R.id.transfer_saves).setOnClickListener(v -> {
-            if (transferFor == null) return; // no game picked yet
-            if (transferExport) exportSavesOf(transferFor);
-            else pick(transferFor, PICK_SAVES);
+        findViewById(R.id.transfer_saves_import).setOnClickListener(v -> {
+            if (transferFor != null) pick(transferFor, PICK_SAVES); // (none picked yet: nothing)
         });
-        findViewById(R.id.transfer_pad).setOnClickListener(v -> {
-            if (transferFor == null) return; // no game picked yet
-            if (transferExport) {
-                exportForId = transferFor.id;
-                exportPad.launch(padFileName(transferFor));
-            } else {
-                pick(transferFor, PICK_PAD);
-            }
+        findViewById(R.id.transfer_saves_export).setOnClickListener(v -> {
+            if (transferFor != null) exportSavesOf(transferFor);
+        });
+        findViewById(R.id.transfer_pad_import).setOnClickListener(v -> {
+            if (transferFor != null) pick(transferFor, PICK_PAD);
+        });
+        findViewById(R.id.transfer_pad_export).setOnClickListener(v -> {
+            if (transferFor == null) return;
+            exportForId = transferFor.id;
+            exportPad.launch(padFileName(transferFor));
+        });
+        findViewById(R.id.transfer_mods_open).setOnClickListener(v -> {
+            if (transferFor != null) startActivity(new Intent(this, ModsActivity.class)
+                    .putExtra(InstanceActivity.EXTRA_ID, transferFor.id));
         });
     }
 
-    // -------------------- Dragon Age's downloadable content (Import tab) --------------------
+    // -------------------- Dragon Age's downloadable content (Import/Export tab) --------------------
 
     private final ActivityResultLauncher<String[]> pickDlc =
             registerForActivityResult(new ActivityResultContracts.OpenMultipleDocuments(), uris -> {
@@ -313,16 +309,18 @@ public class LauncherActivity extends AppCompatActivity {
     /** What depends on the game picked: the buttons work only once one is, and the DLC card. */
     private void showTransferTargets() {
         boolean picked = transferFor != null;
-        for (int button : new int[] { R.id.transfer_saves, R.id.transfer_pad }) {
+        for (int button : new int[] { R.id.transfer_saves_import, R.id.transfer_saves_export,
+                R.id.transfer_pad_import, R.id.transfer_pad_export, R.id.transfer_mods_open }) {
             findViewById(button).setEnabled(picked);
         }
-        showDlcCard();
+        showDaoCards();
     }
 
-    /** The DLC card: on Import, for Dragon Age: Origins (the one game with DLC to add). */
-    private void showDlcCard() {
+    /** The DLC and mods cards: for Dragon Age: Origins, the one game with DLC to add and mods to use. */
+    private void showDaoCards() {
         boolean dao = transferFor != null && Instance.DAO_TITLE_ID.equals(transferFor.titleId());
-        findViewById(R.id.transfer_dlc_card).setVisibility(!transferExport && dao ? View.VISIBLE : View.GONE);
+        findViewById(R.id.transfer_dlc_card).setVisibility(dao ? View.VISIBLE : View.GONE);
+        findViewById(R.id.transfer_mods_card).setVisibility(dao ? View.VISIBLE : View.GONE);
     }
 
     /** Installs the picked packages in the background, with a progress dialog, then says what happened. */
@@ -544,8 +542,6 @@ public class LauncherActivity extends AppCompatActivity {
         else if (id == R.id.action_help || id == R.id.nav_how) showHow();
         else if (id == R.id.nav_driver) InstanceActions.choose(this, R.string.nav_install_driver, instances,
                 i -> pick(i, PICK_DRIVER));
-        else if (id == R.id.nav_mods) InstanceActions.choose(this, R.string.nav_mods, instances,
-                i -> startActivity(new Intent(this, ModsActivity.class).putExtra(InstanceActivity.EXTRA_ID, i.id)));
         else if (id == R.id.nav_bug) bugReport(instances.isEmpty() ? null : instances.get(0));
         else if (id == R.id.nav_theme) Appearance.showDialog(this);
         else if (id == R.id.nav_about) showAbout();

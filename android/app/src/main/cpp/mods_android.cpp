@@ -9,10 +9,6 @@
 #include <fstream>
 #include <set>
 
-#include <jni.h>
-
-#include <SDL3/SDL_system.h>
-
 #include "kernel/vfs.h"
 #include "settings.h"
 
@@ -69,24 +65,5 @@ namespace dao_android
         // Highest priority first: the last mod in the load order wins.
         std::reverse(loadOrder.begin(), loadOrder.end());
         dao::kernel::VfsSetOverlays("\\Device\\Cdrom0", std::move(loadOrder));
-    }
-
-    // The game's "Manage mods" (Options > Graphics): the mods page of this game, over the game.
-    void OpenModsPage()
-    {
-        auto* env = static_cast<JNIEnv*>(SDL_GetAndroidJNIEnv());
-        auto activity = static_cast<jobject>(SDL_GetAndroidActivity());
-        if (!env || !activity)
-        {
-            LOGW("Mods: no activity to open the mods page from");
-            return;
-        }
-        jclass cls = env->GetObjectClass(activity);
-        if (jmethodID id = env->GetMethodID(cls, "openMods", "()V"))
-            env->CallVoidMethod(activity, id);
-        else
-            env->ExceptionClear();
-        env->DeleteLocalRef(cls);
-        env->DeleteLocalRef(activity);
     }
 }
