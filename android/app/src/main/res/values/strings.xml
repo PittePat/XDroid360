@@ -49,6 +49,10 @@
     <string name="language_auto">The phone\'s language</string>
     <string name="setting_diagnostics">Diagnostics for bug reports</string>
     <string name="setting_diagnostics_help">Writes the GPU\'s measurements into the game\'s log (a little slower). Turn it on, play the part that misbehaves, then Report a bug.</string>
+    <string name="setting_widescreen">Widescreen</string>
+    <string name="widescreen_on">On</string>
+    <string name="widescreen_off">Off</string>
+    <string name="widescreen_hint">Fills the screen\'s whole width instead of showing black bars at the sides. Experimental: if the picture looks wrong, turn it off. Takes effect the next time the game starts; run Update game once after updating the launcher.</string>
     <string name="setting_lod">Texture quality</string>
     <string-array name="lod">
         <item>Full (sharpest)</item>
@@ -261,6 +265,7 @@
 <p><b>Renderer</b>: Native draws the game directly with Vulkan and is much faster; Xenia (emulated) is the fallback if Native shows something wrong.<br>
 <b>Driver</b>: Automatic uses the built-in Turnip on Adreno 7xx/8xx and the phone\'s own driver elsewhere. You can install another one from the menu.<br>
 <b>Frame rate</b>: 30 is cooler and kinder to the battery; 60 is smoother.<br>
+<b>Widescreen</b> (Dragon Age only): fills the screen\'s width instead of black bars; turn it off if the picture looks wrong.<br>
 <b>Texture detail</b>: lower it if the game runs out of memory.</p>
 
 <h3>Controls and saves</h3>
