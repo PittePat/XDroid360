@@ -125,7 +125,6 @@ public class InstanceActivity extends AppCompatActivity {
         int visibility = instance.hasWidescreen() ? View.VISIBLE : View.GONE;
         findViewById(R.id.widescreen_label).setVisibility(visibility);
         findViewById(R.id.widescreen).setVisibility(visibility);
-        findViewById(R.id.widescreen_hint).setVisibility(visibility);
         if (!instance.hasWidescreen()) return;
         android.widget.RadioGroup group = findViewById(R.id.widescreen);
         group.setOnCheckedChangeListener(null);

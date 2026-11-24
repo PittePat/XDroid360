@@ -50,7 +50,6 @@
     <string name="setting_widescreen">Широкий экран</string>
     <string name="widescreen_on">Вкл</string>
     <string name="widescreen_off">Выкл</string>
-    <string name="widescreen_hint">Заполняет экран по всей ширине вместо чёрных полос по бокам. Экспериментально: если картинка выглядит неправильно, выключите. Действует со следующего запуска игры; после обновления лаунчера один раз запустите «Обновить игру».</string>
     <string name="setting_lod">Качество текстур</string>
     <string-array name="lod">
         <item>Полная (самая чёткая)</item>
