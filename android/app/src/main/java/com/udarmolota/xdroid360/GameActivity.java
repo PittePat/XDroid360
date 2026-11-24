@@ -650,6 +650,12 @@ public class GameActivity extends SDLActivity {
             case Instance.SYSMEM_OFF: nativeSetenv("TU_DEBUG", ""); break; // set: the library's Adreno 8xx default stays off
             default: break; // the library decides from the GPU
         }
+        // Widescreen (Dragon Age: Origins): the game is told a display as wide as the screen
+        // (app_main.cpp). Set either way so a switch back to Off isn't kept by an earlier start;
+        // env.txt still wins.
+        if (current.hasWidescreen()) {
+            nativeSetenv("DAO_FILL_SCREEN", current.widescreen ? "1" : "0");
+        }
         // Diagnostics for a bug report: the GPU's measurements in the game's log.
         if (current.diagnostics) {
             nativeSetenv("DAO_GPU_STATS", "1");
@@ -688,6 +694,7 @@ public class GameActivity extends SDLActivity {
         }
         Log.i(TAG, "Instance " + current.id + ": driver " + current.driver + ", sysmem " + current.sysmem
                 + ", texture LOD " + current.textureLodToUse() + ", display " + current.hudMode
+                + (current.hasWidescreen() ? ", widescreen " + (current.widescreen ? "on" : "off") : "")
                 + ", language " + current.languageToUse()
                 + (current.option("frame_rate") != null ? ", frame rate " + current.frameRateToUse() : "")
                 + (current.option("preset") != null ? ", preset " + (current.preset.isEmpty() ? "game's own" : current.preset) : ""));

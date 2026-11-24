@@ -79,6 +79,7 @@ public class InstanceActivity extends AppCompatActivity {
         driverPick.setOnClickListener(v -> pickDriver.launch(new String[] { "*/*" }));
         bindSpinner(findViewById(R.id.sysmem), R.array.sysmem, indexOf(SYSMEM, instance.sysmem), i -> instance.sysmem = SYSMEM[i]);
         bindOptions();
+        bindWidescreen();
         bindTextureLod();
         View advanced = findViewById(R.id.advanced);
         View chevron = findViewById(R.id.advanced_chevron);
@@ -118,6 +119,22 @@ public class InstanceActivity extends AppCompatActivity {
     }
 
     private com.google.android.material.textfield.TextInputEditText env;
+
+    /** Widescreen On/Off (Dragon Age: Origins only; hidden for the other games). */
+    private void bindWidescreen() {
+        int visibility = instance.hasWidescreen() ? View.VISIBLE : View.GONE;
+        findViewById(R.id.widescreen_label).setVisibility(visibility);
+        findViewById(R.id.widescreen).setVisibility(visibility);
+        findViewById(R.id.widescreen_hint).setVisibility(visibility);
+        if (!instance.hasWidescreen()) return;
+        android.widget.RadioGroup group = findViewById(R.id.widescreen);
+        group.setOnCheckedChangeListener(null);
+        group.check(instance.widescreen ? R.id.widescreen_on : R.id.widescreen_off);
+        group.setOnCheckedChangeListener((g, checked) -> {
+            instance.widescreen = checked == R.id.widescreen_on;
+            save();
+        });
+    }
 
     /**
      * Texture detail: the one picked, or while none is, the renderer's default (so it follows a
