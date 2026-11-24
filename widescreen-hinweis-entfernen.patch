@@ -1,0 +1,55 @@
+diff --git a/android/app/src/main/java/com/udarmolota/xdroid360/InstanceActivity.java b/android/app/src/main/java/com/udarmolota/xdroid360/InstanceActivity.java
+index b1327a0..2f65dab 100644
+--- a/android/app/src/main/java/com/udarmolota/xdroid360/InstanceActivity.java
++++ b/android/app/src/main/java/com/udarmolota/xdroid360/InstanceActivity.java
+@@ -125,7 +125,6 @@ public class InstanceActivity extends AppCompatActivity {
+         int visibility = instance.hasWidescreen() ? View.VISIBLE : View.GONE;
+         findViewById(R.id.widescreen_label).setVisibility(visibility);
+         findViewById(R.id.widescreen).setVisibility(visibility);
+-        findViewById(R.id.widescreen_hint).setVisibility(visibility);
+         if (!instance.hasWidescreen()) return;
+         android.widget.RadioGroup group = findViewById(R.id.widescreen);
+         group.setOnCheckedChangeListener(null);
+diff --git a/android/app/src/main/res/layout/activity_instance.xml b/android/app/src/main/res/layout/activity_instance.xml
+index 84b33f2..95b39e1 100644
+--- a/android/app/src/main/res/layout/activity_instance.xml
++++ b/android/app/src/main/res/layout/activity_instance.xml
+@@ -310,14 +310,6 @@
+                             android:text="@string/widescreen_off" />
+                     </RadioGroup>
+ 
+-                    <TextView
+-                        android:id="@+id/widescreen_hint"
+-                        android:layout_width="match_parent"
+-                        android:layout_height="wrap_content"
+-                        android:text="@string/widescreen_hint"
+-                        android:textAppearance="?attr/textAppearanceBodySmall"
+-                        android:visibility="gone" />
+-
+                     <TextView
+                         android:layout_width="match_parent"
+                         android:layout_height="wrap_content"
+diff --git a/android/app/src/main/res/values-ru/strings.xml b/android/app/src/main/res/values-ru/strings.xml
+index 8fd9b43..8364057 100644
+--- a/android/app/src/main/res/values-ru/strings.xml
++++ b/android/app/src/main/res/values-ru/strings.xml
+@@ -50,7 +50,6 @@
+     <string name="setting_widescreen">Широкий экран</string>
+     <string name="widescreen_on">Вкл</string>
+     <string name="widescreen_off">Выкл</string>
+-    <string name="widescreen_hint">Заполняет экран по всей ширине вместо чёрных полос по бокам. Экспериментально: если картинка выглядит неправильно, выключите. Действует со следующего запуска игры; после обновления лаунчера один раз запустите «Обновить игру».</string>
+     <string name="setting_lod">Качество текстур</string>
+     <string-array name="lod">
+         <item>Полная (самая чёткая)</item>
+diff --git a/android/app/src/main/res/values/strings.xml b/android/app/src/main/res/values/strings.xml
+index aca46ff..d00a11f 100644
+--- a/android/app/src/main/res/values/strings.xml
++++ b/android/app/src/main/res/values/strings.xml
+@@ -52,7 +52,6 @@
+     <string name="setting_widescreen">Widescreen</string>
+     <string name="widescreen_on">On</string>
+     <string name="widescreen_off">Off</string>
+-    <string name="widescreen_hint">Fills the screen\'s whole width instead of showing black bars at the sides. Experimental: if the picture looks wrong, turn it off. Takes effect the next time the game starts; run Update game once after updating the launcher.</string>
+     <string name="setting_lod">Texture quality</string>
+     <string-array name="lod">
+         <item>Full (sharpest)</item>

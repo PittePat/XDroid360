@@ -311,14 +311,6 @@
                     </RadioGroup>
 
                     <TextView
-                        android:id="@+id/widescreen_hint"
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:text="@string/widescreen_hint"
-                        android:textAppearance="?attr/textAppearanceBodySmall"
-                        android:visibility="gone" />
-
-                    <TextView
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
                         android:layout_marginTop="12dp"
