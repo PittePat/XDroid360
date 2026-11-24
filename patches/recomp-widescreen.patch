@@ -1,8 +1,28 @@
 diff --git a/DAORecomp/gpu/video.cpp b/DAORecomp/gpu/video.cpp
-index 89e82be..667331c 100644
+index 89e82be..940f8da 100644
 --- a/DAORecomp/gpu/video.cpp
 +++ b/DAORecomp/gpu/video.cpp
-@@ -444,6 +444,13 @@ static void SceneTilesHook(PPCContext& ctx, uint8_t* base, PPCFunc* original)
+@@ -436,6 +436,19 @@ DAO_IMPORT_AS(VdSwap, dao::imp::VdSwap)
+ // 2xMSAA (the upscaler failing, or SMAA turned off) from one frame to the next.
+ constexpr dao::kernel::GameAddress kSceneMsaaType{ 0x8316E35C, 0x8323E83C }; // D3DMULTISAMPLE_TYPE, 0: none
+ constexpr dao::kernel::GameAddress kSceneTileRects{ 0x82144D64, 0x8215E5A8 }; // D3DRECT {x1, y1, x2, y2}[2]
++// With 2xMSAA the scene's colour and depth share the 10 MB of EDRAM: width * rows * 2 samples *
++// (4 + 4) bytes. The engine's 1280x512 first tile fills it exactly. A wider display gets fewer rows
++// in the first tile (1600: 400, so 320 are left for the second), in whole 16-row EDRAM tiles; the
++// colour must not spill into the depth that starts at the same EDRAM base as for 1280 (it showed
++// as black bands). Two tiles are enough up to about 1780 pixels wide.
++static uint32_t SceneFirstTileRows(uint32_t displayWidth)
++{
++    if (displayWidth <= 1280)
++        return 512;
++    const uint32_t rows = (1280u * 512u / displayWidth) & ~15u;
++    return rows < 16 ? 16 : rows;
++}
++
+ static void SceneTilesHook(PPCContext& ctx, uint8_t* base, PPCFunc* original)
+ {
+     dao::ui::ApplyEngineGraphicsOptions(base);
+@@ -444,6 +457,13 @@ static void SceneTilesHook(PPCContext& ctx, uint8_t* base, PPCFunc* original)
      if (ctx.r3.s32 != 2)
          return;
      const uint32_t rects = kSceneTileRects.Get();
@@ -16,7 +36,14 @@ index 89e82be..667331c 100644
      if (dao::gpu::XeniaActive() && dao::gpu::XeniaWantsSingleSampleScene())
      {
          PPC_STORE_U32(kSceneMsaaType.Get(), 0);
-@@ -457,3 +464,27 @@ static void SceneTilesHook(PPCContext& ctx, uint8_t* base, PPCFunc* original)
+@@ -453,7 +473,33 @@ static void SceneTilesHook(PPCContext& ctx, uint8_t* base, PPCFunc* original)
+     }
+     else
+     {
+-        PPC_STORE_U32(rects + 12, 512);
++        const uint32_t firstTileRows = SceneFirstTileRows(displayWidth);
++        PPC_STORE_U32(rects + 12, firstTileRows);
++        PPC_STORE_U32(rects + 20, firstTileRows); // the second tile starts where the first ends
      }
  }
  GAME_HOOK(sub_82661640, tu6_sub_826955E8, SceneTilesHook)
