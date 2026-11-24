@@ -40,6 +40,16 @@ final class Instance {
     String sysmem = SYSMEM_AUTO;
     /** Texture detail (dao_texture_lod_bias: 0 full, 1 low, 2 ultra low) picked, -1 for the default. */
     int textureLodBias = -1;
+    /**
+     * Widescreen (Dragon Age: Origins only): the game is told a display as wide as the screen
+     * (DAO_FILL_SCREEN, see GameActivity.applyInstanceSettings) instead of 16:9 with black bars.
+     */
+    boolean widescreen = false;
+
+    /** Whether the Widescreen setting exists for this game. */
+    boolean hasWidescreen() {
+        return DAO_TITLE_ID.equals(titleId());
+    }
 
     /**
      * The texture detail to start with: the one picked, else the renderer's default. Xenia starts
@@ -289,6 +299,7 @@ final class Instance {
             s.put("texture_lod", textureLodBias);                 // -1: the renderer's default
             s.put("texture_lod_bias", textureLodToUse());         // what an older launcher reads
             s.put("hud_mode", hudMode);
+            s.put("widescreen", widescreen);
             s.put("language", language);
             s.put("diagnostics", diagnostics);
             s.put("vibrate_on_touch", vibrateOnTouch);
@@ -335,6 +346,7 @@ final class Instance {
                 }
                 // Before hud_mode: the performance bar was a switch, on unless turned off.
                 language = s.optString("language", language);
+                widescreen = s.optBoolean("widescreen", widescreen);
                 diagnostics = s.optBoolean("diagnostics", diagnostics);
                 hudMode = s.has("hud_mode") ? s.optInt("hud_mode", hudMode)
                         : s.optBoolean("perf_overlay", true) ? HUD_FULL : HUD_OFF;

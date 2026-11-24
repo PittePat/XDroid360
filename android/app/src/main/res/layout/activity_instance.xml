@@ -281,10 +281,47 @@
                         android:layout_height="wrap_content"
                         android:visibility="gone" />
 
+                    <!-- Dragon Age: Origins only (shown by InstanceActivity.bindWidescreen). -->
                     <TextView
+                        android:id="@+id/widescreen_label"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
                         android:layout_marginTop="4dp"
+                        android:text="@string/setting_widescreen"
+                        android:textAppearance="?attr/textAppearanceTitleSmall"
+                        android:visibility="gone" />
+
+                    <RadioGroup
+                        android:id="@+id/widescreen"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:visibility="gone">
+
+                        <com.google.android.material.radiobutton.MaterialRadioButton
+                            android:id="@+id/widescreen_on"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:text="@string/widescreen_on" />
+
+                        <com.google.android.material.radiobutton.MaterialRadioButton
+                            android:id="@+id/widescreen_off"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:text="@string/widescreen_off" />
+                    </RadioGroup>
+
+                    <TextView
+                        android:id="@+id/widescreen_hint"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:text="@string/widescreen_hint"
+                        android:textAppearance="?attr/textAppearanceBodySmall"
+                        android:visibility="gone" />
+
+                    <TextView
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="12dp"
                         android:text="@string/setting_lod"
                         android:textAppearance="?attr/textAppearanceTitleSmall" />
 
