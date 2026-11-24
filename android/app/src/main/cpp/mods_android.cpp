@@ -1,14 +1,16 @@
 // File-override mods (DAORecomp's mods/README.txt): each folder under <instance>/mods/ mirrors the
 // game folder (mods/MyMod/packages/core/override/foo.gda). The enabled ones are layered over the
-// disc in load order, later mods winning. The mods page (ModsActivity) keeps the order and the
-// on/off state in mods/load_order.txt, one folder per line: "+Folder" or "-Folder". Without that
-// file the config.toml's [[mods]] list is used (as the desktop launcher writes it).
+// disc in load order, later mods winning; a mod's title_update/ folder mirrors the title update's
+// own folder and is laid over that. The mods page (ModsActivity) keeps the order and the on/off
+// state in mods/load_order.txt, one folder per line: "+Folder" or "-Folder". Without that file the
+// config.toml's [[mods]] list is used (as the desktop launcher writes it).
 #include "stdafx.h"
 
 #include <algorithm>
 #include <fstream>
 #include <set>
 
+#include "kernel/game_build.h"
 #include "kernel/vfs.h"
 #include "settings.h"
 
@@ -64,6 +66,20 @@ namespace dao_android
         LOGI("Mods: {} enabled", loadOrder.size());
         // Highest priority first: the last mod in the load order wins.
         std::reverse(loadOrder.begin(), loadOrder.end());
+
+        // A mod's title_update/ folder mirrors the title update's own folder (title_update/ next
+        // to game/, with packages/core/patch/ in it): over the update, as the mod is over the disc.
+        // Only when the title update is what runs.
+        if (dao::kernel::IsTitleUpdate())
+        {
+            std::vector<fs::path> updateOverlays;
+            for (const fs::path& mod : loadOrder)
+            {
+                if (fs::is_directory(mod / "title_update", ec))
+                    updateOverlays.push_back(mod / "title_update");
+            }
+            dao::kernel::VfsSetOverlays("\\Device\\Update", std::move(updateOverlays));
+        }
         dao::kernel::VfsSetOverlays("\\Device\\Cdrom0", std::move(loadOrder));
     }
 }
