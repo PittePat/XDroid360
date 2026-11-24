@@ -273,7 +273,7 @@ public class ModsActivity extends AppCompatActivity {
 
     /**
      * Puts a mod's files where the game finds them, as DAORecomp's launcher does: packages/, core/
-     * and override/ folders keep their place, anything else goes to packages/core/override/<mod>/;
+     * and override/ folders keep their place (title_update/ too: it is laid over the title update's folder), anything else goes to packages/core/override/<mod>/;
      * readmes and pictures stay at the top. Returns the mod's folder name.
      */
     private String extract(Uri uri, String name) throws IOException {
@@ -321,7 +321,7 @@ public class ModsActivity extends AppCompatActivity {
                     byte[] buffer = new byte[1 << 16];
                     for (int n; (n = in.read(buffer)) > 0; ) out.write(buffer, 0, n);
                 }
-                if (mapped.startsWith("packages/")) any = true;
+                if (mapped.startsWith("packages/") || mapped.startsWith("title_update/")) any = true;
             }
         } catch (IOException | RuntimeException e) {
             Instance.deleteTree(work);
@@ -344,7 +344,7 @@ public class ModsActivity extends AppCompatActivity {
 
     private static boolean isGameFolder(String segment) {
         String s = segment.toLowerCase(Locale.ROOT);
-        return s.equals("packages") || s.equals("core") || s.equals("override");
+        return s.equals("packages") || s.equals("core") || s.equals("override") || s.equals("title_update");
     }
 
     /** Where a file of the .zip goes in the mod's folder; null to leave it out. */
@@ -355,6 +355,7 @@ public class ModsActivity extends AppCompatActivity {
         String first = (slash < 0 ? path : path.substring(0, slash)).toLowerCase(Locale.ROOT);
         switch (first) {
             case "packages":
+            case "title_update": // the title update's folder (packages/core/patch/ in it)
                 return path;
             case "core":
                 return "packages/" + path;
