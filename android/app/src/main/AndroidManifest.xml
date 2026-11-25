@@ -74,6 +74,10 @@
             android:theme="@style/AppTheme"
             android:exported="false" />
         <activity
+            android:name=".AchievementsActivity"
+            android:theme="@style/LauncherTheme"
+            android:exported="false" />
+        <activity
             android:name=".InstanceActivity"
             android:theme="@style/LauncherTheme"
             android:exported="false" />

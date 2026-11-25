@@ -46,6 +46,11 @@ final class Instance {
      */
     boolean widescreen = false;
 
+    /** Whether the game has achievements the launcher shows (Dragon Age: Origins). */
+    boolean hasAchievements() {
+        return DAO_TITLE_ID.equals(titleId());
+    }
+
     /** Whether the Widescreen setting exists for this game. */
     boolean hasWidescreen() {
         return DAO_TITLE_ID.equals(titleId());

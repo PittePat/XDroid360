@@ -514,6 +514,31 @@ public class GameActivity extends SDLActivity {
         });
     }
 
+    // Achievements (Dragon Age: Origins): the game wrote one (achievements_android.cpp, from the
+    // game's thread). It is recorded for the Achievements list in the settings and announced with a
+    // banner over the game; one that was unlocked before (a new profile, a second playthrough)
+    // is not announced again. The list comes from the game's own default.xex.
+    @SuppressWarnings("unused") // from native code (achievements_android.cpp)
+    public void onAchievementUnlocked(final int id) {
+        final Instance instance = current;
+        if (instance == null || !instance.hasAchievements()) return;
+        new Thread(() -> {
+            try {
+                XdbfAchievements.Entry entry = Achievements.find(Achievements.list(instance), id);
+                if (entry == null) {
+                    Log.w(TAG, "Achievement " + id + " is not in the game's list");
+                    return;
+                }
+                if (!Achievements.markUnlocked(instance, id)) return;
+                Log.i(TAG, "Achievement unlocked: " + id + " (" + Achievements.text(entry.name, "en") + ")");
+                final String language = Achievements.languageCode(instance);
+                runOnUiThread(() -> AchievementToast.show(this, entry, language));
+            } catch (java.io.IOException e) {
+                Log.w(TAG, "Achievement " + id + ": " + e);
+            }
+        }, "achievement").start();
+    }
+
     // The in-game display (Instance.hudMode, as in Zomdroid): the "FPS: XX" counter, or the
     // performance bar (fps, CPU, GPU, RAM, thermal) from the launchers. Both count the frames the
     // game presented. userdata/env.txt DAO_PERF_OVERLAY=0 hides either.
