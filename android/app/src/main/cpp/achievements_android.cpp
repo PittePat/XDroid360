@@ -12,6 +12,12 @@
 
 #include "kernel/achievements.h"
 
+#include <chrono>
+#include <cstdlib>
+#include <sstream>
+#include <string>
+#include <thread>
+
 namespace
 {
     // One achievement unlocked, by its id in the game's list.
@@ -36,6 +42,29 @@ namespace
         env->DeleteLocalRef(activity);
     }
 
+    // Test without playing: userdata/env.txt line DAO_TEST_ACHIEVEMENT=<id>[,<id>...] unlocks
+    // those achievements through the same path the game's own call takes (callback, JNI, the list
+    // and the banner), 45 seconds after the library loads, 6 seconds apart. It does not test the
+    // game's XGI message itself; the log's "XGI message" lines show that one. Remove the line
+    // and delete userdata/achievements.json afterwards: the test unlocks are kept like real ones.
+    void RunTestUnlocks()
+    {
+        std::this_thread::sleep_for(std::chrono::seconds(45));
+        const char* value = std::getenv("DAO_TEST_ACHIEVEMENT");
+        if (!value || !*value)
+            return;
+        LOGI("DAO_TEST_ACHIEVEMENT={}", value);
+        std::stringstream ids(value);
+        std::string id;
+        while (std::getline(ids, id, ','))
+        {
+            if (const long n = std::strtol(id.c_str(), nullptr, 10); n > 0)
+                OnUnlocked(uint32_t(n));
+            std::this_thread::sleep_for(std::chrono::seconds(6));
+        }
+    }
+
     // Installed when the library loads (the callback pointer is constant-initialised).
-    const bool s_installed = (dao::kernel::g_achievementCallback = &OnUnlocked, true);
+    const bool s_installed = (dao::kernel::g_achievementCallback = &OnUnlocked,
+                              std::thread(RunTestUnlocks).detach(), true);
 }
