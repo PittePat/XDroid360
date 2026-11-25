@@ -309,4 +309,16 @@
     <string name="cheat_done_gold">Added %1$s gold</string>
     <string name="cheat_done_xp">Added %1$s XP</string>
     <string name="cheat_done_strengthened">The party is stronger</string>
+
+    <!-- Achievements (Dragon Age: Origins): the game's own list, points and texts -->
+    <string name="achievements_title">Achievements</string>
+    <string name="achievements_open">Show achievements</string>
+    <string name="achievements_summary">%1$d of %2$d unlocked · %3$d of %4$d points</string>
+    <string name="achievements_unreadable">The achievements could not be read from the game: %1$s</string>
+    <string name="achievement_unlocked">Achievement unlocked</string>
+    <string name="achievement_points">%1$d points</string>
+    <string name="achievement_secret">Secret achievement</string>
+    <string name="achievement_secret_hint">Keep playing to find out.</string>
+    <string name="achievement_open">Not unlocked yet</string>
+    <string name="achievement_done">Unlocked on %1$s</string>
 </resources>

@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Achievements (Dragon Age: Origins) -->
+    <string name="achievements_title">Achievements</string>
+    <string name="achievements_open">Achievements anzeigen</string>
+    <string name="achievements_summary">%1$d von %2$d freigeschaltet · %3$d von %4$d Punkten</string>
+    <string name="achievements_unreadable">Die Achievements konnten nicht aus dem Spiel gelesen werden: %1$s</string>
+    <string name="achievement_unlocked">Achievement freigeschaltet</string>
+    <string name="achievement_points">%1$d Punkte</string>
+    <string name="achievement_secret">Geheimes Achievement</string>
+    <string name="achievement_secret_hint">Spiel weiter, um es zu entdecken.</string>
+    <string name="achievement_open">Noch nicht freigeschaltet</string>
+    <string name="achievement_done">Freigeschaltet am %1$s</string>
+</resources>

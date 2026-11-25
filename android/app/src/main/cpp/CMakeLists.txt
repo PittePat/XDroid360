@@ -92,6 +92,7 @@ set(DAO_FRONT_SOURCES
     virtual_pad_jni.cpp
     keyboard_android.cpp
     cheats_android.cpp
+    achievements_android.cpp
     mods_android.cpp
     vulkan_private_loader.c
     xdroid360_note.c)

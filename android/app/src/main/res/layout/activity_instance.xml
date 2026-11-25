@@ -152,6 +152,34 @@
                 </LinearLayout>
             </com.google.android.material.card.MaterialCardView>
 
+            <!-- Achievements (Dragon Age: Origins): opens the list. -->
+            <com.google.android.material.card.MaterialCardView
+                android:id="@+id/achievements_card"
+                style="@style/DaoCard"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:visibility="gone">
+
+                <LinearLayout
+                    style="@style/DaoCardContent"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content">
+
+                    <TextView
+                        style="@style/DaoCardTitle"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:text="@string/achievements_title" />
+
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/achievements_open"
+                        style="@style/Widget.Material3.Button.TonalButton"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="@string/achievements_open" />
+                </LinearLayout>
+            </com.google.android.material.card.MaterialCardView>
+
             <!-- Frame rate cap: the game's own [video] frame_rate, read and written in place. -->
             <com.google.android.material.card.MaterialCardView
                 android:id="@+id/fps_cap_card"

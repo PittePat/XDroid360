@@ -1,0 +1,916 @@
+diff -ruN a/android/app/src/main/AndroidManifest.xml b/android/app/src/main/AndroidManifest.xml
+--- a/android/app/src/main/AndroidManifest.xml	2026-11-25 01:27:49.056408587 +0000
++++ b/android/app/src/main/AndroidManifest.xml	2026-11-25 01:27:49.664695394 +0000
+@@ -74,6 +74,10 @@
+             android:theme="@style/AppTheme"
+             android:exported="false" />
+         <activity
++            android:name=".AchievementsActivity"
++            android:theme="@style/LauncherTheme"
++            android:exported="false" />
++        <activity
+             android:name=".InstanceActivity"
+             android:theme="@style/LauncherTheme"
+             android:exported="false" />
+diff -ruN a/android/app/src/main/cpp/CMakeLists.txt b/android/app/src/main/cpp/CMakeLists.txt
+--- a/android/app/src/main/cpp/CMakeLists.txt	2026-11-25 01:27:49.056928931 +0000
++++ b/android/app/src/main/cpp/CMakeLists.txt	2026-11-25 01:27:49.665272707 +0000
+@@ -92,6 +92,7 @@
+     virtual_pad_jni.cpp
+     keyboard_android.cpp
+     cheats_android.cpp
++    achievements_android.cpp
+     mods_android.cpp
+     vulkan_private_loader.c
+     xdroid360_note.c)
+diff -ruN a/android/app/src/main/cpp/achievements_android.cpp b/android/app/src/main/cpp/achievements_android.cpp
+--- a/android/app/src/main/cpp/achievements_android.cpp	1970-01-01 00:00:00.000000000 +0000
++++ b/android/app/src/main/cpp/achievements_android.cpp	2026-11-25 01:27:49.667881756 +0000
+@@ -0,0 +1,41 @@
++// Achievements (Dragon Age: Origins): the game reports an unlocked achievement to the console's
++// gamer services (XUserWriteAchievements, through XMsgStartIORequest: kernel/xam.cpp calls the
++// callback installed below, on the game's thread). The phone passes the id on to the launcher's
++// side (GameActivity.onAchievementUnlocked), which records it for the Achievements list in the
++// game's settings and shows the "Achievement unlocked" banner. The list itself, with the points
++// and the texts, is the game's own (read from its default.xex by XdbfAchievements.java).
++#include "stdafx.h"
++
++#include <jni.h>
++
++#include <SDL3/SDL_system.h>
++
++#include "kernel/achievements.h"
++
++namespace
++{
++    // One achievement unlocked, by its id in the game's list.
++    void OnUnlocked(uint32_t id)
++    {
++        auto* env = static_cast<JNIEnv*>(SDL_GetAndroidJNIEnv());
++        auto activity = static_cast<jobject>(SDL_GetAndroidActivity());
++        if (!env || !activity)
++        {
++            LOGW("Achievement {}: no activity", id);
++            return;
++        }
++        jclass cls = env->GetObjectClass(activity);
++        if (jmethodID method = env->GetMethodID(cls, "onAchievementUnlocked", "(I)V"))
++            env->CallVoidMethod(activity, method, jint(id));
++        else
++        {
++            env->ExceptionClear();
++            LOGW("Achievement {}: GameActivity.onAchievementUnlocked missing", id);
++        }
++        env->DeleteLocalRef(cls);
++        env->DeleteLocalRef(activity);
++    }
++
++    // Installed when the library loads (the callback pointer is constant-initialised).
++    const bool s_installed = (dao::kernel::g_achievementCallback = &OnUnlocked, true);
++}
+diff -ruN a/android/app/src/main/java/com/udarmolota/xdroid360/AchievementToast.java b/android/app/src/main/java/com/udarmolota/xdroid360/AchievementToast.java
+--- a/android/app/src/main/java/com/udarmolota/xdroid360/AchievementToast.java	1970-01-01 00:00:00.000000000 +0000
++++ b/android/app/src/main/java/com/udarmolota/xdroid360/AchievementToast.java	2026-11-25 01:27:49.673312684 +0000
+@@ -0,0 +1,100 @@
++package com.udarmolota.xdroid360;
++
++import android.app.Activity;
++import android.graphics.BitmapFactory;
++import android.graphics.Color;
++import android.graphics.Typeface;
++import android.graphics.drawable.GradientDrawable;
++import android.os.Handler;
++import android.os.Looper;
++import android.view.Gravity;
++import android.view.View;
++import android.widget.FrameLayout;
++import android.widget.ImageView;
++import android.widget.LinearLayout;
++import android.widget.TextView;
++
++import java.util.ArrayDeque;
++
++/**
++ * "Achievement unlocked" over the running game: a small banner at the top of the screen for a few
++ * seconds (touches go through to the game). Several unlocks at once show one after the other.
++ * Main thread only.
++ */
++final class AchievementToast {
++    private static final long SHOW_MS = 4500, FADE_MS = 300;
++    private static final Handler HANDLER = new Handler(Looper.getMainLooper());
++    private static final ArrayDeque<Runnable> QUEUE = new ArrayDeque<>();
++    private static boolean showing;
++
++    private AchievementToast() {}
++
++    static void show(Activity activity, XdbfAchievements.Entry entry, String language) {
++        QUEUE.add(() -> display(activity, entry, language));
++        if (!showing) next();
++    }
++
++    private static void next() {
++        Runnable r = QUEUE.poll();
++        showing = r != null;
++        if (r != null) r.run();
++    }
++
++    private static void display(Activity activity, XdbfAchievements.Entry entry, String language) {
++        if (activity.isFinishing()) {
++            QUEUE.clear();
++            showing = false;
++            return;
++        }
++        float dp = activity.getResources().getDisplayMetrics().density;
++        LinearLayout row = new LinearLayout(activity);
++        row.setOrientation(LinearLayout.HORIZONTAL);
++        row.setGravity(Gravity.CENTER_VERTICAL);
++        int pad = Math.round(10 * dp);
++        row.setPadding(pad, pad, Math.round(18 * dp), pad);
++        GradientDrawable bg = new GradientDrawable();
++        bg.setColor(0xF0202020);
++        bg.setCornerRadius(28 * dp);
++        bg.setStroke(Math.round(1.5f * dp), 0xFFB8A15C);
++        row.setBackground(bg);
++        row.setElevation(8 * dp);
++
++        ImageView icon = new ImageView(activity);
++        if (entry.icon != null) icon.setImageBitmap(BitmapFactory.decodeByteArray(entry.icon, 0, entry.icon.length));
++        int size = Math.round(48 * dp);
++        row.addView(icon, new LinearLayout.LayoutParams(size, size));
++
++        LinearLayout texts = new LinearLayout(activity);
++        texts.setOrientation(LinearLayout.VERTICAL);
++        texts.setPadding(Math.round(12 * dp), 0, 0, 0);
++        texts.addView(label(activity, activity.getString(R.string.achievement_unlocked), 11, 0xFFB8A15C, false));
++        texts.addView(label(activity, Achievements.text(entry.name, language), 16, Color.WHITE, true));
++        texts.addView(label(activity, activity.getString(R.string.achievement_points, entry.points), 12, 0xFFCCCCCC, false));
++        row.addView(texts);
++
++        FrameLayout.LayoutParams lp = new FrameLayout.LayoutParams(
++                FrameLayout.LayoutParams.WRAP_CONTENT, FrameLayout.LayoutParams.WRAP_CONTENT,
++                Gravity.TOP | Gravity.CENTER_HORIZONTAL);
++        lp.topMargin = Math.round(16 * dp);
++        row.setAlpha(0f);
++        activity.addContentView(row, lp);
++        row.animate().alpha(1f).setDuration(FADE_MS).start();
++        HANDLER.postDelayed(() -> row.animate().alpha(0f).setDuration(FADE_MS).withEndAction(() -> {
++            if (row.getParent() instanceof android.view.ViewGroup) ((android.view.ViewGroup) row.getParent()).removeView(row);
++            next();
++        }).start(), SHOW_MS);
++    }
++
++    private static TextView label(Activity activity, String text, int sp, int color, boolean bold) {
++        TextView t = new TextView(activity);
++        t.setText(text);
++        t.setTextSize(sp);
++        t.setTextColor(color);
++        t.setSingleLine(true);
++        t.setEllipsize(android.text.TextUtils.TruncateAt.END);
++        t.setMaxWidth(Math.round(240 * activity.getResources().getDisplayMetrics().density));
++        if (bold) t.setTypeface(Typeface.DEFAULT_BOLD);
++        t.setVisibility(View.VISIBLE);
++        return t;
++    }
++}
+diff -ruN a/android/app/src/main/java/com/udarmolota/xdroid360/Achievements.java b/android/app/src/main/java/com/udarmolota/xdroid360/Achievements.java
+--- a/android/app/src/main/java/com/udarmolota/xdroid360/Achievements.java	1970-01-01 00:00:00.000000000 +0000
++++ b/android/app/src/main/java/com/udarmolota/xdroid360/Achievements.java	2026-11-25 01:27:49.673120558 +0000
+@@ -0,0 +1,126 @@
++package com.udarmolota.xdroid360;
++
++import org.json.JSONException;
++import org.json.JSONObject;
++
++import java.io.File;
++import java.io.IOException;
++import java.nio.charset.StandardCharsets;
++import java.nio.file.Files;
++import java.util.ArrayList;
++import java.util.Collections;
++import java.util.HashMap;
++import java.util.List;
++import java.util.Locale;
++import java.util.Map;
++
++/**
++ * A game's achievements: the list the game itself defines (read from its default.xex,
++ * {@link XdbfAchievements}) and which of them the player has unlocked (userdata/achievements.json,
++ * {id: time in ms}). The game reports an unlock through GameActivity.onAchievementUnlocked.
++ */
++final class Achievements {
++    private static final Map<String, List<XdbfAchievements.Entry>> CACHE = new HashMap<>();
++
++    private Achievements() {}
++
++    /** Whether this game has achievements the launcher can show (Dragon Age: Origins). */
++    static boolean supported(Instance instance) {
++        return instance != null && instance.hasAchievements() && new File(instance.game(), "default.xex").isFile();
++    }
++
++    /** Every achievement of the game, in the game's order. Throws if the XEX can't be read. */
++    static synchronized List<XdbfAchievements.Entry> list(Instance instance) throws IOException {
++        String key = instance.root.getPath();
++        List<XdbfAchievements.Entry> cached = CACHE.get(key);
++        if (cached == null) {
++            cached = Collections.unmodifiableList(XdbfAchievements.readFromXex(new File(instance.game(), "default.xex")));
++            CACHE.put(key, cached);
++        }
++        return cached;
++    }
++
++    private static File file(Instance instance) {
++        return new File(instance.userdata(), "achievements.json");
++    }
++
++    /** The unlocked achievements: id to the time of the unlock (ms since the epoch). */
++    static synchronized Map<Integer, Long> unlocked(Instance instance) {
++        Map<Integer, Long> out = new HashMap<>();
++        try {
++            File f = file(instance);
++            if (!f.isFile()) return out;
++            JSONObject json = new JSONObject(new String(Files.readAllBytes(f.toPath()), StandardCharsets.UTF_8));
++            for (java.util.Iterator<String> it = json.keys(); it.hasNext(); ) {
++                String k = it.next();
++                out.put(Integer.parseInt(k), json.optLong(k, 0));
++            }
++        } catch (IOException | JSONException | NumberFormatException e) {
++            android.util.Log.w("XDroid360", "achievements.json: " + e);
++        }
++        return out;
++    }
++
++    /** Records an unlock; false if the achievement was unlocked before (no second notice). */
++    static synchronized boolean markUnlocked(Instance instance, int id) {
++        Map<Integer, Long> have = unlocked(instance);
++        if (have.containsKey(id)) return false;
++        have.put(id, System.currentTimeMillis());
++        try {
++            JSONObject json = new JSONObject();
++            for (Map.Entry<Integer, Long> e : have.entrySet()) json.put(String.valueOf(e.getKey()), e.getValue());
++            //noinspection ResultOfMethodCallIgnored
++            instance.userdata().mkdirs();
++            File tmp = new File(file(instance).getPath() + ".tmp");
++            Files.write(tmp.toPath(), json.toString().getBytes(StandardCharsets.UTF_8));
++            Files.move(tmp.toPath(), file(instance).toPath(), java.nio.file.StandardCopyOption.REPLACE_EXISTING);
++        } catch (IOException | JSONException e) {
++            android.util.Log.w("XDroid360", "achievements.json not written: " + e);
++        }
++        return true;
++    }
++
++    static XdbfAchievements.Entry find(List<XdbfAchievements.Entry> all, int id) {
++        for (XdbfAchievements.Entry e : all) if (e.id == id) return e;
++        return null;
++    }
++
++    /** The XDBF language code for the game's language setting (the phone's language while unset). */
++    static String languageCode(Instance instance) {
++        String l = instance.language == null ? "" : instance.language;
++        switch (l) {
++            case "english": return "en";
++            case "german": return "de";
++            case "french": return "fr";
++            case "italian": return "it";
++            case "spanish": return "es";
++            case "polish": return "pl";
++            case "russian": return "ru";
++            default: return Locale.getDefault().getLanguage();
++        }
++    }
++
++    /** A text in the language, else English, else any. */
++    static String text(Map<String, String> texts, String language) {
++        String t = texts.get(language);
++        if (t == null) t = texts.get("en");
++        if (t == null && !texts.isEmpty()) t = texts.values().iterator().next();
++        return t == null ? "" : t;
++    }
++
++    static int totalPoints(List<XdbfAchievements.Entry> all) {
++        int n = 0;
++        for (XdbfAchievements.Entry e : all) n += e.points;
++        return n;
++    }
++
++    static int earnedPoints(List<XdbfAchievements.Entry> all, Map<Integer, Long> unlocked) {
++        int n = 0;
++        for (XdbfAchievements.Entry e : all) if (unlocked.containsKey(e.id)) n += e.points;
++        return n;
++    }
++
++    static List<XdbfAchievements.Entry> copy(List<XdbfAchievements.Entry> all) {
++        return new ArrayList<>(all);
++    }
++}
+diff -ruN a/android/app/src/main/java/com/udarmolota/xdroid360/AchievementsActivity.java b/android/app/src/main/java/com/udarmolota/xdroid360/AchievementsActivity.java
+--- a/android/app/src/main/java/com/udarmolota/xdroid360/AchievementsActivity.java	1970-01-01 00:00:00.000000000 +0000
++++ b/android/app/src/main/java/com/udarmolota/xdroid360/AchievementsActivity.java	2026-11-25 01:27:49.673634371 +0000
+@@ -0,0 +1,169 @@
++package com.udarmolota.xdroid360;
++
++import android.graphics.Bitmap;
++import android.graphics.BitmapFactory;
++import android.graphics.ColorMatrix;
++import android.graphics.ColorMatrixColorFilter;
++import android.os.Bundle;
++import android.text.format.DateFormat;
++import android.view.Gravity;
++import android.view.View;
++import android.view.ViewGroup;
++import android.widget.BaseAdapter;
++import android.widget.ImageView;
++import android.widget.LinearLayout;
++import android.widget.ListView;
++import android.widget.TextView;
++
++import androidx.appcompat.app.AppCompatActivity;
++
++import com.google.android.material.appbar.MaterialToolbar;
++import com.google.android.material.progressindicator.LinearProgressIndicator;
++
++import java.io.IOException;
++import java.util.Date;
++import java.util.List;
++import java.util.Map;
++
++/**
++ * Every achievement the game has, with its points and whether it is unlocked, and the points
++ * earned out of the total. Opened from the game's settings (InstanceActivity).
++ */
++public class AchievementsActivity extends AppCompatActivity {
++    private Instance instance;
++    private List<XdbfAchievements.Entry> all;
++    private Map<Integer, Long> unlocked;
++    private String language;
++    private TextView summary;
++    private LinearProgressIndicator progress;
++    private Adapter adapter;
++
++    @Override
++    protected void onCreate(Bundle savedInstanceState) {
++        Appearance.apply(this);
++        super.onCreate(savedInstanceState);
++        instance = Instance.open(this, getIntent().getStringExtra(InstanceActivity.EXTRA_ID));
++        language = Achievements.languageCode(instance);
++
++        LinearLayout root = new LinearLayout(this);
++        root.setOrientation(LinearLayout.VERTICAL);
++        MaterialToolbar toolbar = new MaterialToolbar(this);
++        toolbar.setTitle(R.string.achievements_title);
++        toolbar.setNavigationIcon(androidx.appcompat.R.drawable.abc_ic_ab_back_material);
++        toolbar.setNavigationOnClickListener(v -> finish());
++        root.addView(toolbar, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
++
++        int pad = dp(16);
++        LinearLayout header = new LinearLayout(this);
++        header.setOrientation(LinearLayout.VERTICAL);
++        header.setPadding(pad, dp(8), pad, dp(12));
++        summary = new TextView(this);
++        summary.setTextSize(16);
++        header.addView(summary);
++        progress = new LinearProgressIndicator(this);
++        LinearLayout.LayoutParams plp = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
++        plp.topMargin = dp(8);
++        header.addView(progress, plp);
++        root.addView(header);
++
++        ListView list = new ListView(this);
++        list.setDividerHeight(0);
++        list.setSelector(android.R.color.transparent);
++        adapter = new Adapter();
++        list.setAdapter(adapter);
++        root.addView(list, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f));
++        setContentView(root);
++        androidx.core.view.ViewCompat.setOnApplyWindowInsetsListener(root, (v, insets) -> {
++            androidx.core.graphics.Insets bars = insets.getInsets(androidx.core.view.WindowInsetsCompat.Type.systemBars());
++            v.setPadding(bars.left, bars.top, bars.right, bars.bottom);
++            return insets;
++        });
++    }
++
++    @Override
++    protected void onResume() {
++        super.onResume();
++        reload(); // an unlock while the game ran
++    }
++
++    private void reload() {
++        try {
++            all = Achievements.list(instance);
++        } catch (IOException e) {
++            summary.setText(getString(R.string.achievements_unreadable, e.getMessage()));
++            progress.setVisibility(View.GONE);
++            return;
++        }
++        unlocked = Achievements.unlocked(instance);
++        int total = Achievements.totalPoints(all), earned = Achievements.earnedPoints(all, unlocked);
++        summary.setText(getString(R.string.achievements_summary, unlocked.size(), all.size(), earned, total));
++        progress.setMax(Math.max(1, total));
++        progress.setProgress(earned);
++        adapter.notifyDataSetChanged();
++    }
++
++    private int dp(int v) {
++        return Math.round(v * getResources().getDisplayMetrics().density);
++    }
++
++    private final class Adapter extends BaseAdapter {
++        @Override public int getCount() { return all == null ? 0 : all.size(); }
++        @Override public Object getItem(int i) { return all.get(i); }
++        @Override public long getItemId(int i) { return all.get(i).id; }
++
++        @Override
++        public View getView(int position, View convert, ViewGroup parent) {
++            XdbfAchievements.Entry e = all.get(position);
++            boolean done = unlocked.containsKey(e.id);
++            boolean hide = e.secret && !done;
++
++            LinearLayout row = new LinearLayout(AchievementsActivity.this);
++            row.setOrientation(LinearLayout.HORIZONTAL);
++            row.setGravity(Gravity.CENTER_VERTICAL);
++            row.setPadding(dp(16), dp(8), dp(16), dp(8));
++
++            ImageView icon = new ImageView(AchievementsActivity.this);
++            if (e.icon != null) {
++                Bitmap b = BitmapFactory.decodeByteArray(e.icon, 0, e.icon.length);
++                icon.setImageBitmap(b);
++            }
++            if (!done) { // grey and dim until it is earned
++                ColorMatrix gray = new ColorMatrix();
++                gray.setSaturation(0f);
++                icon.setColorFilter(new ColorMatrixColorFilter(gray));
++                icon.setAlpha(0.45f);
++            }
++            row.addView(icon, new LinearLayout.LayoutParams(dp(56), dp(56)));
++
++            LinearLayout texts = new LinearLayout(AchievementsActivity.this);
++            texts.setOrientation(LinearLayout.VERTICAL);
++            texts.setPadding(dp(12), 0, dp(8), 0);
++            TextView name = new TextView(AchievementsActivity.this);
++            name.setTextSize(16);
++            name.setTypeface(android.graphics.Typeface.DEFAULT_BOLD);
++            name.setText(hide ? getString(R.string.achievement_secret) : Achievements.text(e.name, language));
++            TextView desc = new TextView(AchievementsActivity.this);
++            desc.setTextSize(13);
++            desc.setText(hide ? getString(R.string.achievement_secret_hint)
++                    : Achievements.text(done ? e.unlocked : e.locked, language));
++            TextView status = new TextView(AchievementsActivity.this);
++            status.setTextSize(12);
++            status.setText(done
++                    ? getString(R.string.achievement_done, DateFormat.getMediumDateFormat(AchievementsActivity.this)
++                            .format(new Date(unlocked.get(e.id))))
++                    : getString(R.string.achievement_open));
++            status.setTextColor(done ? 0xFF2E7D32 : 0xFF888888);
++            texts.addView(name);
++            texts.addView(desc);
++            texts.addView(status);
++            row.addView(texts, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
++
++            TextView points = new TextView(AchievementsActivity.this);
++            points.setTextSize(15);
++            points.setTypeface(android.graphics.Typeface.DEFAULT_BOLD);
++            points.setText(String.valueOf(e.points));
++            row.addView(points);
++            return row;
++        }
++    }
++}
+diff -ruN a/android/app/src/main/java/com/udarmolota/xdroid360/GameActivity.java b/android/app/src/main/java/com/udarmolota/xdroid360/GameActivity.java
+--- a/android/app/src/main/java/com/udarmolota/xdroid360/GameActivity.java	2026-11-25 01:27:49.061488090 +0000
++++ b/android/app/src/main/java/com/udarmolota/xdroid360/GameActivity.java	2026-11-25 01:27:49.669783497 +0000
+@@ -514,6 +514,31 @@
+         });
+     }
+ 
++    // Achievements (Dragon Age: Origins): the game wrote one (achievements_android.cpp, from the
++    // game's thread). It is recorded for the Achievements list in the settings and announced with a
++    // banner over the game; one that was unlocked before (a new profile, a second playthrough)
++    // is not announced again. The list comes from the game's own default.xex.
++    @SuppressWarnings("unused") // from native code (achievements_android.cpp)
++    public void onAchievementUnlocked(final int id) {
++        final Instance instance = current;
++        if (instance == null || !instance.hasAchievements()) return;
++        new Thread(() -> {
++            try {
++                XdbfAchievements.Entry entry = Achievements.find(Achievements.list(instance), id);
++                if (entry == null) {
++                    Log.w(TAG, "Achievement " + id + " is not in the game's list");
++                    return;
++                }
++                if (!Achievements.markUnlocked(instance, id)) return;
++                Log.i(TAG, "Achievement unlocked: " + id + " (" + Achievements.text(entry.name, "en") + ")");
++                final String language = Achievements.languageCode(instance);
++                runOnUiThread(() -> AchievementToast.show(this, entry, language));
++            } catch (java.io.IOException e) {
++                Log.w(TAG, "Achievement " + id + ": " + e);
++            }
++        }, "achievement").start();
++    }
++
+     // The in-game display (Instance.hudMode, as in Zomdroid): the "FPS: XX" counter, or the
+     // performance bar (fps, CPU, GPU, RAM, thermal) from the launchers. Both count the frames the
+     // game presented. userdata/env.txt DAO_PERF_OVERLAY=0 hides either.
+diff -ruN a/android/app/src/main/java/com/udarmolota/xdroid360/Instance.java b/android/app/src/main/java/com/udarmolota/xdroid360/Instance.java
+--- a/android/app/src/main/java/com/udarmolota/xdroid360/Instance.java	2026-11-25 01:27:49.061807616 +0000
++++ b/android/app/src/main/java/com/udarmolota/xdroid360/Instance.java	2026-11-25 01:27:49.670182583 +0000
+@@ -46,6 +46,11 @@
+      */
+     boolean widescreen = false;
+ 
++    /** Whether the game has achievements the launcher shows (Dragon Age: Origins). */
++    boolean hasAchievements() {
++        return DAO_TITLE_ID.equals(titleId());
++    }
++
+     /** Whether the Widescreen setting exists for this game. */
+     boolean hasWidescreen() {
+         return DAO_TITLE_ID.equals(titleId());
+diff -ruN a/android/app/src/main/java/com/udarmolota/xdroid360/InstanceActivity.java b/android/app/src/main/java/com/udarmolota/xdroid360/InstanceActivity.java
+--- a/android/app/src/main/java/com/udarmolota/xdroid360/InstanceActivity.java	2026-11-25 01:27:49.062242113 +0000
++++ b/android/app/src/main/java/com/udarmolota/xdroid360/InstanceActivity.java	2026-11-25 01:27:49.670511284 +0000
+@@ -80,6 +80,7 @@
+         bindSpinner(findViewById(R.id.sysmem), R.array.sysmem, indexOf(SYSMEM, instance.sysmem), i -> instance.sysmem = SYSMEM[i]);
+         bindOptions();
+         bindWidescreen();
++        bindAchievements();
+         bindTextureLod();
+         View advanced = findViewById(R.id.advanced);
+         View chevron = findViewById(R.id.advanced_chevron);
+@@ -120,6 +121,16 @@
+ 
+     private com.google.android.material.textfield.TextInputEditText env;
+ 
++    /** The Achievements button (Dragon Age: Origins): the list, the points, what is unlocked. */
++    private void bindAchievements() {
++        View card = findViewById(R.id.achievements_card);
++        boolean on = Achievements.supported(instance);
++        card.setVisibility(on ? View.VISIBLE : View.GONE);
++        if (!on) return;
++        findViewById(R.id.achievements_open).setOnClickListener(v -> startActivity(
++                new Intent(this, AchievementsActivity.class).putExtra(EXTRA_ID, getIntent().getStringExtra(EXTRA_ID))));
++    }
++
+     /** Widescreen On/Off (Dragon Age: Origins only; hidden for the other games). */
+     private void bindWidescreen() {
+         int visibility = instance.hasWidescreen() ? View.VISIBLE : View.GONE;
+diff -ruN a/android/app/src/main/java/com/udarmolota/xdroid360/XdbfAchievements.java b/android/app/src/main/java/com/udarmolota/xdroid360/XdbfAchievements.java
+--- a/android/app/src/main/java/com/udarmolota/xdroid360/XdbfAchievements.java	1970-01-01 00:00:00.000000000 +0000
++++ b/android/app/src/main/java/com/udarmolota/xdroid360/XdbfAchievements.java	2026-11-25 01:27:49.672922457 +0000
+@@ -0,0 +1,261 @@
++package com.udarmolota.xdroid360;
++
++import java.io.IOException;
++import java.io.RandomAccessFile;
++import java.nio.charset.StandardCharsets;
++import java.util.ArrayList;
++import java.util.LinkedHashMap;
++import java.util.List;
++import java.util.Map;
++
++import javax.crypto.Cipher;
++import javax.crypto.spec.IvParameterSpec;
++import javax.crypto.spec.SecretKeySpec;
++
++/**
++ * Reads a game's achievements out of its default.xex: the XEX's resource section holds the title's
++ * XDBF ("SPA") file with every achievement (id, points, flags, icon, texts in each language the disc
++ * has). The game defines all of it; nothing here is invented.
++ *
++ * Pure Java (no Android classes) so it can run on a PC too. Handles retail XEX2 files with normal
++ * encryption and none/basic compression, which is what the discs' default.xex use. The title
++ * update's default.xexp is a delta patch and is not read: the base executable has the base game's
++ * achievements.
++ */
++final class XdbfAchievements {
++    /** One achievement. Texts are per language code ("en", "de", ...), as the XDBF string tables. */
++    static final class Entry {
++        int id;
++        int points;
++        int flags;
++        /** Not shown (name and description) until unlocked: the "show unachieved" flag is clear. */
++        boolean secret;
++        byte[] icon; // PNG
++        final Map<String, String> name = new LinkedHashMap<>();
++        final Map<String, String> unlocked = new LinkedHashMap<>();
++        final Map<String, String> locked = new LinkedHashMap<>();
++    }
++
++    private static final byte[] RETAIL_KEY = hex("20B185A59D28FDC340583FBB0896BF91");
++    private static final long XDBF_NS_METADATA = 1, XDBF_NS_IMAGE = 2, XDBF_NS_STRINGS = 3;
++    private static final long XACH = 0x58414348L;
++
++    private XdbfAchievements() {}
++
++    /** The XDBF language id's two-letter code (the ids the string tables are filed under). */
++    static String languageCode(int id) {
++        switch (id) {
++            case 1: return "en";
++            case 2: return "ja";
++            case 3: return "de";
++            case 4: return "fr";
++            case 5: return "es";
++            case 6: return "it";
++            case 7: return "ko";
++            case 8: return "zh";
++            case 9: return "pt";
++            case 11: return "pl";
++            case 12: return "ru";
++            default: return "lang" + id;
++        }
++    }
++
++    static List<Entry> readFromXex(java.io.File xex) throws IOException {
++        try (RandomAccessFile f = new RandomAccessFile(xex, "r")) {
++            return parse(readResource(f));
++        }
++    }
++
++    // ------------------------------------------------------------------ XEX
++
++    private static byte[] readResource(RandomAccessFile f) throws IOException {
++        byte[] head = new byte[24];
++        f.readFully(head);
++        if (u32(head, 0) != 0x58455832L) throw new IOException("not an XEX2 file");
++        long peOffset = u32(head, 8);
++        long securityOffset = u32(head, 16);
++        int optionalCount = (int) u32(head, 20);
++        if (optionalCount < 0 || optionalCount > 64) throw new IOException("bad XEX header");
++        byte[] opt = new byte[optionalCount * 8];
++        f.readFully(opt);
++        long resourceInfo = -1, fileFormat = -1, baseAddress = 0;
++        for (int i = 0; i < optionalCount; i++) {
++            long key = u32(opt, i * 8), value = u32(opt, i * 8 + 4);
++            if (key == 0x2FF) resourceInfo = value;
++            else if (key == 0x3FF) fileFormat = value;
++            else if (key == 0x10201) baseAddress = value;
++        }
++        if (resourceInfo < 0 || fileFormat < 0) throw new IOException("XEX has no resource or file format info");
++
++        byte[] fmt = new byte[8];
++        f.seek(fileFormat);
++        f.readFully(fmt);
++        long fmtSize = u32(fmt, 0);
++        int encryption = u16(fmt, 4), compression = u16(fmt, 6);
++        if (compression > 1) throw new IOException("XEX compression " + compression + " is not supported");
++        // Basic compression: (data size, zero size) pairs; none: the file is the image.
++        List<long[]> blocks = new ArrayList<>(); // {imageStart, fileOffset, dataSize, zeroSize}
++        long image = 0, file = peOffset;
++        if (compression == 1) {
++            byte[] raw = new byte[(int) (fmtSize - 8)];
++            f.readFully(raw);
++            for (int i = 0; i + 8 <= raw.length; i += 8) {
++                long data = u32(raw, i), zero = u32(raw, i + 4);
++                blocks.add(new long[] { image, file, data, zero });
++                image += data + zero;
++                file += data;
++            }
++        } else {
++            blocks.add(new long[] { 0, peOffset, f.length() - peOffset, 0 });
++        }
++
++        // The title's resource: the first entry of the resource table (named after the title id).
++        f.seek(resourceInfo);
++        byte[] rhead = new byte[4];
++        f.readFully(rhead);
++        if (u32(rhead, 0) < 20) throw new IOException("XEX has no resources");
++        byte[] entry = new byte[16];
++        f.readFully(entry);
++        long address = u32(entry, 8), size = u32(entry, 12);
++        if (size <= 0 || size > 64L * 1024 * 1024) throw new IOException("bad resource size");
++
++        byte[] key = null;
++        if (encryption != 0) {
++            byte[] enc = new byte[16];
++            f.seek(securityOffset + 0x150);
++            f.readFully(enc);
++            try {
++                Cipher c = Cipher.getInstance("AES/ECB/NoPadding");
++                c.init(Cipher.DECRYPT_MODE, new SecretKeySpec(RETAIL_KEY, "AES"));
++                key = c.doFinal(enc);
++            } catch (Exception e) {
++                throw new IOException(e);
++            }
++        }
++        return readImage(f, blocks, key, peOffset, address - baseAddress, (int) size);
++    }
++
++    /** Bytes [at, at+length) of the decrypted, expanded image. */
++    private static byte[] readImage(RandomAccessFile f, List<long[]> blocks, byte[] key, long origin, long at, int length) throws IOException {
++        byte[] out = new byte[length];
++        long end = at + length;
++        for (long[] b : blocks) {
++            long dataStart = b[0], dataEnd = b[0] + b[2];
++            long from = Math.max(at, dataStart), to = Math.min(end, dataEnd);
++            if (from >= to) continue; // a zero range or outside the data: out stays zero
++            readDecrypted(f, b[1] + (from - dataStart), out, (int) (from - at), (int) (to - from), key, origin);
++        }
++        return out;
++    }
++
++    /**
++     * Reads length bytes at fileOffset, decrypting AES-CBC (zero IV; the chain runs through all the
++     * encrypted data, which starts at origin, the PE offset): start at the 16-byte block holding
++     * fileOffset, with the ciphertext block before it as the IV.
++     */
++    private static void readDecrypted(RandomAccessFile f, long fileOffset, byte[] out, int outAt, int length,
++                                      byte[] key, long origin) throws IOException {
++        if (key == null) {
++            f.seek(fileOffset);
++            f.readFully(out, outAt, length);
++            return;
++        }
++        long start = origin + ((fileOffset - origin) / 16) * 16;
++        byte[] iv = new byte[16];
++        if (start > origin) {
++            f.seek(start - 16);
++            f.readFully(iv);
++        }
++        int skip = (int) (fileOffset - start);
++        byte[] enc = new byte[(skip + length + 15) / 16 * 16];
++        f.seek(start);
++        f.readFully(enc);
++        try {
++            Cipher c = Cipher.getInstance("AES/CBC/NoPadding");
++            c.init(Cipher.DECRYPT_MODE, new SecretKeySpec(key, "AES"), new IvParameterSpec(iv));
++            System.arraycopy(c.doFinal(enc), skip, out, outAt, length);
++        } catch (Exception e) {
++            throw new IOException(e);
++        }
++    }
++
++    // ------------------------------------------------------------------ XDBF
++
++    static List<Entry> parse(byte[] x) throws IOException {
++        if (x.length < 24 || u32(x, 0) != 0x58444246L) throw new IOException("resource is not an XDBF");
++        long tableLen = u32(x, 8), entryCount = u32(x, 12), freeLen = u32(x, 16);
++        long dataStart = 24 + tableLen * 18 + freeLen * 8;
++        Map<Long, byte[]> strings = new LinkedHashMap<>();
++        Map<Long, byte[]> images = new LinkedHashMap<>();
++        byte[] xach = null;
++        for (int i = 0; i < entryCount; i++) {
++            int p = 24 + i * 18;
++            int ns = u16(x, p);
++            long id = u64(x, p + 2), off = u32(x, p + 10), size = u32(x, p + 14);
++            int s = (int) (dataStart + off);
++            if (s < 0 || s + size > x.length) continue;
++            byte[] data = java.util.Arrays.copyOfRange(x, s, s + (int) size);
++            if (ns == XDBF_NS_STRINGS) strings.put(id, data);
++            else if (ns == XDBF_NS_IMAGE) images.put(id, data);
++            else if (ns == XDBF_NS_METADATA && id == XACH) xach = data;
++        }
++        if (xach == null) throw new IOException("no achievement table");
++
++        Map<String, Map<Integer, String>> tables = new LinkedHashMap<>();
++        for (Map.Entry<Long, byte[]> e : strings.entrySet()) {
++            tables.put(languageCode((int) (long) e.getKey()), stringTable(e.getValue()));
++        }
++        int count = u16(xach, 12);
++        List<Entry> out = new ArrayList<>();
++        for (int k = 0; k < count; k++) {
++            int p = 14 + k * 36;
++            if (p + 36 > xach.length) break;
++            Entry a = new Entry();
++            a.id = u16(xach, p);
++            int nameId = u16(xach, p + 2), unlockedId = u16(xach, p + 4), lockedId = u16(xach, p + 6);
++            long imageId = u32(xach, p + 8);
++            a.points = (int) (u32(xach, p + 12) >>> 16); // the 16 high bits (the rest is padding)
++            a.flags = (int) u32(xach, p + 16);
++            a.secret = (a.flags & 0x8) == 0;
++            a.icon = images.get(imageId);
++            for (Map.Entry<String, Map<Integer, String>> t : tables.entrySet()) {
++                put(a.name, t.getKey(), t.getValue().get(nameId));
++                put(a.unlocked, t.getKey(), t.getValue().get(unlockedId));
++                put(a.locked, t.getKey(), t.getValue().get(lockedId));
++            }
++            out.add(a);
++        }
++        return out;
++    }
++
++    private static void put(Map<String, String> m, String k, String v) {
++        if (v != null) m.put(k, v);
++    }
++
++    private static Map<Integer, String> stringTable(byte[] b) {
++        Map<Integer, String> out = new LinkedHashMap<>();
++        if (b.length < 14) return out;
++        int count = u16(b, 12), p = 14;
++        for (int i = 0; i < count && p + 4 <= b.length; i++) {
++            int id = u16(b, p), len = u16(b, p + 2);
++            if (p + 4 + len > b.length) break;
++            out.put(id, new String(b, p + 4, len, StandardCharsets.UTF_8));
++            p += 4 + len;
++        }
++        return out;
++    }
++
++    // ------------------------------------------------------------------ bytes
++
++    private static int u16(byte[] b, int o) { return ((b[o] & 0xFF) << 8) | (b[o + 1] & 0xFF); }
++    private static long u32(byte[] b, int o) {
++        return ((long) (b[o] & 0xFF) << 24) | ((b[o + 1] & 0xFF) << 16) | ((b[o + 2] & 0xFF) << 8) | (b[o + 3] & 0xFF);
++    }
++    private static long u64(byte[] b, int o) { return (u32(b, o) << 32) | u32(b, o + 4); }
++
++    private static byte[] hex(String s) {
++        byte[] out = new byte[s.length() / 2];
++        for (int i = 0; i < out.length; i++) out[i] = (byte) Integer.parseInt(s.substring(i * 2, i * 2 + 2), 16);
++        return out;
++    }
++}
+diff -ruN a/android/app/src/main/res/layout/activity_instance.xml b/android/app/src/main/res/layout/activity_instance.xml
+--- a/android/app/src/main/res/layout/activity_instance.xml	2026-11-25 01:27:49.418171751 +0000
++++ b/android/app/src/main/res/layout/activity_instance.xml	2026-11-25 01:27:49.960054936 +0000
+@@ -152,6 +152,34 @@
+                 </LinearLayout>
+             </com.google.android.material.card.MaterialCardView>
+ 
++            <!-- Achievements (Dragon Age: Origins): opens the list. -->
++            <com.google.android.material.card.MaterialCardView
++                android:id="@+id/achievements_card"
++                style="@style/DaoCard"
++                android:layout_width="match_parent"
++                android:layout_height="wrap_content"
++                android:visibility="gone">
++
++                <LinearLayout
++                    style="@style/DaoCardContent"
++                    android:layout_width="match_parent"
++                    android:layout_height="wrap_content">
++
++                    <TextView
++                        style="@style/DaoCardTitle"
++                        android:layout_width="match_parent"
++                        android:layout_height="wrap_content"
++                        android:text="@string/achievements_title" />
++
++                    <com.google.android.material.button.MaterialButton
++                        android:id="@+id/achievements_open"
++                        style="@style/Widget.Material3.Button.TonalButton"
++                        android:layout_width="wrap_content"
++                        android:layout_height="wrap_content"
++                        android:text="@string/achievements_open" />
++                </LinearLayout>
++            </com.google.android.material.card.MaterialCardView>
++
+             <!-- Frame rate cap: the game's own [video] frame_rate, read and written in place. -->
+             <com.google.android.material.card.MaterialCardView
+                 android:id="@+id/fps_cap_card"
+diff -ruN a/android/app/src/main/res/values/strings.xml b/android/app/src/main/res/values/strings.xml
+--- a/android/app/src/main/res/values/strings.xml	2026-11-25 01:27:49.420974664 +0000
++++ b/android/app/src/main/res/values/strings.xml	2026-11-25 01:27:49.962117565 +0000
+@@ -309,4 +309,16 @@
+     <string name="cheat_done_gold">Added %1$s gold</string>
+     <string name="cheat_done_xp">Added %1$s XP</string>
+     <string name="cheat_done_strengthened">The party is stronger</string>
++
++    <!-- Achievements (Dragon Age: Origins): the game's own list, points and texts -->
++    <string name="achievements_title">Achievements</string>
++    <string name="achievements_open">Show achievements</string>
++    <string name="achievements_summary">%1$d of %2$d unlocked · %3$d of %4$d points</string>
++    <string name="achievements_unreadable">The achievements could not be read from the game: %1$s</string>
++    <string name="achievement_unlocked">Achievement unlocked</string>
++    <string name="achievement_points">%1$d points</string>
++    <string name="achievement_secret">Secret achievement</string>
++    <string name="achievement_secret_hint">Keep playing to find out.</string>
++    <string name="achievement_open">Not unlocked yet</string>
++    <string name="achievement_done">Unlocked on %1$s</string>
+ </resources>
+diff -ruN a/android/app/src/main/res/values-de/strings.xml b/android/app/src/main/res/values-de/strings.xml
+--- a/android/app/src/main/res/values-de/strings.xml	1970-01-01 00:00:00.000000000 +0000
++++ b/android/app/src/main/res/values-de/strings.xml	2026-11-25 01:27:49.962674869 +0000
+@@ -0,0 +1,14 @@
++<?xml version="1.0" encoding="utf-8"?>
++<resources>
++    <!-- Achievements (Dragon Age: Origins) -->
++    <string name="achievements_title">Achievements</string>
++    <string name="achievements_open">Achievements anzeigen</string>
++    <string name="achievements_summary">%1$d von %2$d freigeschaltet · %3$d von %4$d Punkten</string>
++    <string name="achievements_unreadable">Die Achievements konnten nicht aus dem Spiel gelesen werden: %1$s</string>
++    <string name="achievement_unlocked">Achievement freigeschaltet</string>
++    <string name="achievement_points">%1$d Punkte</string>
++    <string name="achievement_secret">Geheimes Achievement</string>
++    <string name="achievement_secret_hint">Spiel weiter, um es zu entdecken.</string>
++    <string name="achievement_open">Noch nicht freigeschaltet</string>
++    <string name="achievement_done">Freigeschaltet am %1$s</string>
++</resources>
+diff -ruN a/android/app/src/main/res/values-ru/strings.xml b/android/app/src/main/res/values-ru/strings.xml
+--- a/android/app/src/main/res/values-ru/strings.xml	2026-11-25 01:27:49.420427422 +0000
++++ b/android/app/src/main/res/values-ru/strings.xml	2026-11-25 01:27:49.961349859 +0000
+@@ -275,4 +275,16 @@
+     <string name="cheat_done_gold">Добавлено золота: %1$s</string>
+     <string name="cheat_done_xp">Добавлено опыта: %1$s</string>
+     <string name="cheat_done_strengthened">Группа стала сильнее</string>
++
++    <!-- Достижения (Dragon Age: Origins) -->
++    <string name="achievements_title">Достижения</string>
++    <string name="achievements_open">Показать достижения</string>
++    <string name="achievements_summary">Получено %1$d из %2$d · очков %3$d из %4$d</string>
++    <string name="achievements_unreadable">Не удалось прочитать достижения игры: %1$s</string>
++    <string name="achievement_unlocked">Достижение получено</string>
++    <string name="achievement_points">Очков: %1$d</string>
++    <string name="achievement_secret">Секретное достижение</string>
++    <string name="achievement_secret_hint">Играйте дальше, чтобы узнать.</string>
++    <string name="achievement_open">Ещё не получено</string>
++    <string name="achievement_done">Получено: %1$s</string>
+ </resources>
