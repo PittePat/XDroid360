@@ -80,7 +80,6 @@ public class InstanceActivity extends AppCompatActivity {
         bindSpinner(findViewById(R.id.sysmem), R.array.sysmem, indexOf(SYSMEM, instance.sysmem), i -> instance.sysmem = SYSMEM[i]);
         bindOptions();
         bindWidescreen();
-        bindAchievements();
         bindTextureLod();
         View advanced = findViewById(R.id.advanced);
         View chevron = findViewById(R.id.advanced_chevron);
@@ -120,16 +119,6 @@ public class InstanceActivity extends AppCompatActivity {
     }
 
     private com.google.android.material.textfield.TextInputEditText env;
-
-    /** The Achievements button (Dragon Age: Origins): the list, the points, what is unlocked. */
-    private void bindAchievements() {
-        View card = findViewById(R.id.achievements_card);
-        boolean on = Achievements.supported(instance);
-        card.setVisibility(on ? View.VISIBLE : View.GONE);
-        if (!on) return;
-        findViewById(R.id.achievements_open).setOnClickListener(v -> startActivity(
-                new Intent(this, AchievementsActivity.class).putExtra(EXTRA_ID, getIntent().getStringExtra(EXTRA_ID))));
-    }
 
     /** Widescreen On/Off (Dragon Age: Origins only; hidden for the other games). */
     private void bindWidescreen() {

@@ -278,7 +278,6 @@
 
     <!-- Достижения (Dragon Age: Origins) -->
     <string name="achievements_title">Достижения</string>
-    <string name="achievements_open">Показать достижения</string>
     <string name="achievements_summary">Получено %1$d из %2$d · очков %3$d из %4$d</string>
     <string name="achievements_unreadable">Не удалось прочитать достижения игры: %1$s</string>
     <string name="achievement_unlocked">Достижение получено</string>

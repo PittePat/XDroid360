@@ -11,6 +11,7 @@
 #include <SDL3/SDL_system.h>
 
 #include "kernel/achievements.h"
+#include "ui/cheats.h"
 
 #include <chrono>
 #include <cstdlib>
@@ -20,6 +21,34 @@
 
 namespace
 {
+    // Calls a method of GameActivity with no arguments (the game's thread; the UI thread does the
+    // dialog's work).
+    void CallActivity(const char* method)
+    {
+        auto* env = static_cast<JNIEnv*>(SDL_GetAndroidJNIEnv());
+        auto activity = static_cast<jobject>(SDL_GetAndroidActivity());
+        if (!env || !activity)
+        {
+            LOGW("Achievements: no activity for {}", method);
+            return;
+        }
+        jclass cls = env->GetObjectClass(activity);
+        if (jmethodID id = env->GetMethodID(cls, method, "()V"))
+            env->CallVoidMethod(activity, id);
+        else
+        {
+            env->ExceptionClear();
+            LOGW("Achievements: GameActivity.{} missing", method);
+        }
+        env->DeleteLocalRef(cls);
+        env->DeleteLocalRef(activity);
+    }
+
+    // The list over the paused game (the START menu's Achievements row: the runtime's ui/cheats.cpp
+    // pauses the world and calls these).
+    void ShowList() { CallActivity("showAchievements"); }
+    void HideList() { CallActivity("hideAchievements"); }
+
     // One achievement unlocked, by its id in the game's list.
     void OnUnlocked(uint32_t id)
     {
@@ -66,5 +95,14 @@ namespace
 
     // Installed when the library loads (the callback pointer is constant-initialised).
     const bool s_installed = (dao::kernel::g_achievementCallback = &OnUnlocked,
+                              dao::kernel::g_showAchievementsList = &ShowList,
+                              dao::kernel::g_hideAchievementsList = &HideList,
                               std::thread(RunTestUnlocks).detach(), true);
+}
+
+// The player closed the list (Back, a tap outside it, Close): the paused game goes on.
+extern "C" JNIEXPORT void JNICALL Java_com_udarmolota_xdroid360_GameActivity_nativeAchievementsClosed(JNIEnv*, jclass)
+{
+    if (dao::ui::CheatsOpen())
+        dao::ui::ToggleCheats();
 }

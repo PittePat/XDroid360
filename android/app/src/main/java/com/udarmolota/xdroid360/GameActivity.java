@@ -514,6 +514,100 @@ public class GameActivity extends SDLActivity {
         });
     }
 
+    // The achievements list over the paused game: the START menu's Achievements row (the runtime's
+    // ui/cheats.cpp pauses the world behind it as for the cheats; achievements_android.cpp). The
+    // same list as the launcher's (AchievementsView), in the game's menus' look.
+    private static native void nativeAchievementsClosed();
+
+    private android.app.Dialog achievementsDialog;
+
+    @SuppressWarnings("unused") // from native code (achievements_android.cpp)
+    public void showAchievements() {
+        runOnUiThread(() -> {
+            final Instance instance = current;
+            if (achievementsDialog != null || instance == null || isFinishing() || isDestroyed()) {
+                return;
+            }
+            final android.content.Context ui = new android.view.ContextThemeWrapper(this, R.style.LauncherTheme);
+            final float dp = getResources().getDisplayMetrics().density;
+            final android.util.DisplayMetrics screen = getResources().getDisplayMetrics();
+
+            // The panel: dark ground, a gold edge, a serif title between gold lines (as the menus' plates).
+            final android.widget.LinearLayout panel = new android.widget.LinearLayout(ui);
+            panel.setOrientation(android.widget.LinearLayout.VERTICAL);
+            android.graphics.drawable.GradientDrawable ground = new android.graphics.drawable.GradientDrawable();
+            ground.setColor(0xF2160F0A);
+            ground.setCornerRadius(6 * dp);
+            ground.setStroke(Math.round(2 * dp), AchievementsView.GAME_GOLD);
+            panel.setBackground(ground);
+
+            final android.widget.TextView title = new android.widget.TextView(ui);
+            title.setText(R.string.achievements_title);
+            title.setTextSize(24);
+            title.setTypeface(android.graphics.Typeface.create(android.graphics.Typeface.SERIF, android.graphics.Typeface.BOLD));
+            title.setTextColor(AchievementsView.GAME_GOLD_BRIGHT);
+            title.setShadowLayer(4, 1, 2, android.graphics.Color.BLACK);
+            title.setGravity(android.view.Gravity.CENTER);
+            title.setPadding(0, Math.round(14 * dp), 0, Math.round(10 * dp));
+            panel.addView(title);
+            panel.addView(goldLine(ui, dp));
+
+            final AchievementsView list = new AchievementsView(ui, instance, true);
+            list.reload();
+            panel.addView(list, new android.widget.LinearLayout.LayoutParams(
+                    android.view.ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f));
+            panel.addView(goldLine(ui, dp));
+
+            final android.widget.TextView close = new android.widget.TextView(ui);
+            close.setText(R.string.cheats_close);
+            close.setTextSize(18);
+            close.setTypeface(android.graphics.Typeface.SERIF);
+            close.setTextColor(AchievementsView.GAME_TEXT);
+            close.setShadowLayer(3, 1, 1, android.graphics.Color.BLACK);
+            close.setGravity(android.view.Gravity.CENTER);
+            close.setPadding(0, Math.round(12 * dp), 0, Math.round(12 * dp));
+            panel.addView(close);
+
+            // A dimmed scrim over the game; a tap outside the panel closes it.
+            final android.widget.FrameLayout scrim = new android.widget.FrameLayout(ui);
+            scrim.setBackgroundColor(0xB0000000);
+            final int width = Math.min(Math.round(620 * dp), Math.round(screen.widthPixels * 0.92f));
+            final int height = Math.round(screen.heightPixels * 0.9f);
+            final android.widget.FrameLayout.LayoutParams panelParams =
+                    new android.widget.FrameLayout.LayoutParams(width, height, android.view.Gravity.CENTER);
+            scrim.addView(panel, panelParams);
+            panel.setClickable(true); // a tap on the panel isn't a tap outside it
+
+            final android.app.Dialog dialog = new android.app.Dialog(ui, android.R.style.Theme_Translucent_NoTitleBar);
+            dialog.setContentView(scrim);
+            scrim.setOnClickListener(v -> dialog.dismiss());
+            close.setOnClickListener(v -> dialog.dismiss());
+            dialog.setOnDismissListener(d -> {
+                achievementsDialog = null;
+                nativeAchievementsClosed();
+            });
+            achievementsDialog = dialog;
+            dialog.show();
+        });
+    }
+
+    private static android.view.View goldLine(android.content.Context context, float dp) {
+        android.view.View line = new android.view.View(context);
+        line.setBackgroundColor(AchievementsView.GAME_GOLD);
+        line.setLayoutParams(new android.widget.LinearLayout.LayoutParams(
+                android.view.ViewGroup.LayoutParams.MATCH_PARENT, Math.max(1, Math.round(1.5f * dp))));
+        return line;
+    }
+
+    @SuppressWarnings("unused") // from native code (achievements_android.cpp)
+    public void hideAchievements() {
+        runOnUiThread(() -> {
+            if (achievementsDialog != null) {
+                achievementsDialog.dismiss();
+            }
+        });
+    }
+
     // Achievements (Dragon Age: Origins): the game wrote one (achievements_android.cpp, from the
     // game's thread). It is recorded for the Achievements list in the settings and announced with a
     // banner over the game; one that was unlocked before (a new profile, a second playthrough)
