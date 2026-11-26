@@ -347,12 +347,12 @@ public class GameActivity extends SDLActivity {
 
     // The cheats menu (ui/cheats.h, cheats_android.cpp): the game is paused behind this dialog
     // while it's open. The rows are cheats_android.cpp's Row; the scripts run on the game's
-    // thread, between frames. (From PR #12 by PittePat; texts in strings.xml, a Material dialog.)
+    // thread, between frames. (From PR #12 by PittePat; texts in strings.xml; the look is GamePanel's, the game's menus'.)
     private static native String nativeCheatsUse(int row, int amount);
     private static native int nativeCheatsState();
     private static native void nativeCheatsClosed();
 
-    private androidx.appcompat.app.AlertDialog cheatsDialog;
+    private android.app.Dialog cheatsDialog;
 
     private static final int[] CHEAT_NAMES = { R.string.cheat_immortal, R.string.cheat_skills, R.string.cheat_kill,
             R.string.cheat_gold, R.string.cheat_xp, R.string.cheat_strengthen };
@@ -383,22 +383,25 @@ public class GameActivity extends SDLActivity {
             if (cheatsDialog != null || isFinishing() || isDestroyed()) {
                 return;
             }
-            // The game's own theme isn't a Material one: the dialog and its buttons take the launcher's.
-            final android.content.Context ui = new android.view.ContextThemeWrapper(this, R.style.LauncherTheme);
+            // The panel is the achievements list's (GamePanel): the game's menus' look.
+            final android.content.Context ui = GamePanel.themed(this);
             final float dp = getResources().getDisplayMetrics().density;
-            final int pad = Math.round(20 * dp);
+            final int pad = Math.round(16 * dp);
+            final int gap = Math.round(8 * dp);
             final android.widget.LinearLayout column = new android.widget.LinearLayout(ui);
             column.setOrientation(android.widget.LinearLayout.VERTICAL);
-            column.setPadding(pad, Math.round(4 * dp), pad, 0);
+            column.setPadding(pad, Math.round(4 * dp), pad, Math.round(12 * dp));
 
-            final android.widget.Button[] switches = new android.widget.Button[2];
+            final android.widget.TextView[] switches = new android.widget.TextView[2];
             final android.os.Handler handler = new android.os.Handler(android.os.Looper.getMainLooper());
             final Runnable refresh = () -> {
                 int state = nativeCheatsState();
-                switches[0].setText(getString(R.string.cheat_switch, getString(CHEAT_NAMES[0]),
-                        getString((state & 1) != 0 ? R.string.cheat_on : R.string.cheat_off)));
-                switches[1].setText(getString(R.string.cheat_switch, getString(CHEAT_NAMES[1]),
-                        getString((state & 2) != 0 ? R.string.cheat_on : R.string.cheat_off)));
+                for (int i = 0; i < 2; i++) {
+                    boolean on = (state & (1 << i)) != 0;
+                    switches[i].setText(getString(R.string.cheat_switch, getString(CHEAT_NAMES[i]),
+                            getString(on ? R.string.cheat_on : R.string.cheat_off)));
+                    GamePanel.setActive(switches[i], on);
+                }
             };
             // The game applies a cheat on its next frame: the switches are read a moment after.
             final java.util.function.BiConsumer<Integer, Integer> use = (row, amount) -> {
@@ -411,73 +414,53 @@ public class GameActivity extends SDLActivity {
 
             for (int row = 0; row < CHEAT_NAMES.length; row++) {
                 final int r = row;
-                android.widget.TextView note = new android.widget.TextView(ui);
-                note.setText(CHEAT_NOTES[row]);
-                note.setTextSize(12);
-                note.setAlpha(0.7f);
+                android.widget.TextView note = GamePanel.note(ui, getString(CHEAT_NOTES[row]));
                 if (row == 3 || row == 4) {
-                    android.widget.TextView title = new android.widget.TextView(ui);
-                    title.setText(CHEAT_NAMES[row]);
-                    title.setTextSize(15);
-                    title.setPadding(0, Math.round(10 * dp), 0, 0);
-                    column.addView(title);
+                    column.addView(GamePanel.heading(ui, getString(CHEAT_NAMES[row])));
                     column.addView(note);
                     android.widget.LinearLayout line = new android.widget.LinearLayout(ui);
                     line.setOrientation(android.widget.LinearLayout.HORIZONTAL);
                     String[] labels = row == 3 ? GOLD_LABELS : XP_LABELS;
                     for (int i = 0; i < labels.length; i++) {
                         final int a = i;
-                        com.google.android.material.button.MaterialButton b = new com.google.android.material.button.MaterialButton(
-                                ui, null, com.google.android.material.R.attr.materialButtonOutlinedStyle);
-                        b.setText("+" + labels[i]);
-                        b.setAllCaps(false);
-                        b.setPadding(0, 0, 0, 0);
+                        android.widget.TextView b = GamePanel.button(ui, "+" + labels[i], true);
                         b.setOnClickListener(v -> use.accept(r, a));
                         android.widget.LinearLayout.LayoutParams lp = new android.widget.LinearLayout.LayoutParams(0,
                                 android.view.ViewGroup.LayoutParams.WRAP_CONTENT, 1f);
-                        lp.setMarginEnd(Math.round(4 * dp));
+                        if (i < labels.length - 1) {
+                            lp.setMarginEnd(Math.round(6 * dp));
+                        }
                         line.addView(b, lp);
                     }
-                    column.addView(line);
+                    android.widget.LinearLayout.LayoutParams lineParams = new android.widget.LinearLayout.LayoutParams(
+                            android.view.ViewGroup.LayoutParams.MATCH_PARENT, android.view.ViewGroup.LayoutParams.WRAP_CONTENT);
+                    lineParams.topMargin = gap;
+                    column.addView(line, lineParams);
                 } else {
-                    com.google.android.material.button.MaterialButton b = new com.google.android.material.button.MaterialButton(ui);
-                    b.setAllCaps(false);
-                    b.setText(CHEAT_NAMES[row]);
+                    android.widget.TextView b = GamePanel.button(ui, getString(CHEAT_NAMES[row]), false);
                     b.setOnClickListener(v -> use.accept(r, 0));
                     if (row < 2) {
                         switches[row] = b;
                     }
                     android.widget.LinearLayout.LayoutParams lp = new android.widget.LinearLayout.LayoutParams(
                             android.view.ViewGroup.LayoutParams.MATCH_PARENT, android.view.ViewGroup.LayoutParams.WRAP_CONTENT);
-                    lp.topMargin = Math.round(8 * dp);
+                    lp.topMargin = Math.round(12 * dp);
                     column.addView(b, lp);
                     column.addView(note);
                 }
             }
 
             // Add Ability: a talent, spell or skill by its id (abi_base), for the character you control.
-            android.widget.TextView abilityTitle = new android.widget.TextView(ui);
-            abilityTitle.setText(R.string.cheat_ability);
-            abilityTitle.setTextSize(15);
-            abilityTitle.setPadding(0, Math.round(10 * dp), 0, 0);
-            column.addView(abilityTitle);
-            android.widget.TextView abilityNote = new android.widget.TextView(ui);
-            abilityNote.setText(R.string.cheat_ability_note);
-            abilityNote.setTextSize(12);
-            abilityNote.setAlpha(0.7f);
-            column.addView(abilityNote);
+            column.addView(GamePanel.heading(ui, getString(R.string.cheat_ability)));
+            column.addView(GamePanel.note(ui, getString(R.string.cheat_ability_note)));
             android.widget.LinearLayout abilityLine = new android.widget.LinearLayout(ui);
             abilityLine.setOrientation(android.widget.LinearLayout.HORIZONTAL);
-            final android.widget.EditText abilityId = new android.widget.EditText(ui);
-            abilityId.setHint(R.string.cheat_ability_hint);
-            abilityId.setInputType(android.text.InputType.TYPE_CLASS_NUMBER);
+            abilityLine.setGravity(android.view.Gravity.CENTER_VERTICAL);
+            final android.widget.EditText abilityId = GamePanel.numberField(ui, R.string.cheat_ability_hint);
             abilityId.setText("4020");
             abilityLine.addView(abilityId, new android.widget.LinearLayout.LayoutParams(0,
                     android.view.ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
-            com.google.android.material.button.MaterialButton abilityAdd = new com.google.android.material.button.MaterialButton(
-                    ui, null, com.google.android.material.R.attr.materialButtonOutlinedStyle);
-            abilityAdd.setText(R.string.cheat_ability_add);
-            abilityAdd.setAllCaps(false);
+            android.widget.TextView abilityAdd = GamePanel.button(ui, getString(R.string.cheat_ability_add), true);
             abilityAdd.setOnClickListener(v -> {
                 try {
                     use.accept(6, Integer.parseInt(abilityId.getText().toString().trim()));
@@ -485,17 +468,19 @@ public class GameActivity extends SDLActivity {
                     android.widget.Toast.makeText(this, R.string.cheat_ability_hint, android.widget.Toast.LENGTH_SHORT).show();
                 }
             });
-            abilityLine.addView(abilityAdd);
-            column.addView(abilityLine);
+            android.widget.LinearLayout.LayoutParams addParams = new android.widget.LinearLayout.LayoutParams(
+                    android.view.ViewGroup.LayoutParams.WRAP_CONTENT, android.view.ViewGroup.LayoutParams.WRAP_CONTENT);
+            addParams.setMarginStart(Math.round(8 * dp));
+            abilityLine.addView(abilityAdd, addParams);
+            android.widget.LinearLayout.LayoutParams abilityParams = new android.widget.LinearLayout.LayoutParams(
+                    android.view.ViewGroup.LayoutParams.MATCH_PARENT, android.view.ViewGroup.LayoutParams.WRAP_CONTENT);
+            abilityParams.topMargin = gap;
+            column.addView(abilityLine, abilityParams);
 
             android.widget.ScrollView scroll = new android.widget.ScrollView(ui);
+            scroll.setFillViewport(false);
             scroll.addView(column);
-            cheatsDialog = new com.google.android.material.dialog.MaterialAlertDialogBuilder(ui)
-                    .setTitle(R.string.cheats_title)
-                    .setView(scroll)
-                    .setPositiveButton(R.string.cheats_close, null)
-                    .create();
-            cheatsDialog.setOnDismissListener(d -> {
+            cheatsDialog = GamePanel.create(this, R.string.cheats_title, scroll, () -> {
                 handler.removeCallbacksAndMessages(null);
                 cheatsDialog = null;
                 nativeCheatsClosed();
@@ -528,76 +513,14 @@ public class GameActivity extends SDLActivity {
             if (achievementsDialog != null || instance == null || isFinishing() || isDestroyed()) {
                 return;
             }
-            final android.content.Context ui = new android.view.ContextThemeWrapper(this, R.style.LauncherTheme);
-            final float dp = getResources().getDisplayMetrics().density;
-            final android.util.DisplayMetrics screen = getResources().getDisplayMetrics();
-
-            // The panel: dark ground, a gold edge, a serif title between gold lines (as the menus' plates).
-            final android.widget.LinearLayout panel = new android.widget.LinearLayout(ui);
-            panel.setOrientation(android.widget.LinearLayout.VERTICAL);
-            android.graphics.drawable.GradientDrawable ground = new android.graphics.drawable.GradientDrawable();
-            ground.setColor(0xF2160F0A);
-            ground.setCornerRadius(6 * dp);
-            ground.setStroke(Math.round(2 * dp), AchievementsView.GAME_GOLD);
-            panel.setBackground(ground);
-
-            final android.widget.TextView title = new android.widget.TextView(ui);
-            title.setText(R.string.achievements_title);
-            title.setTextSize(20);
-            title.setTypeface(android.graphics.Typeface.create(android.graphics.Typeface.SERIF, android.graphics.Typeface.BOLD));
-            title.setTextColor(AchievementsView.GAME_GOLD_BRIGHT);
-            title.setShadowLayer(4, 1, 2, android.graphics.Color.BLACK);
-            title.setGravity(android.view.Gravity.CENTER);
-            title.setPadding(0, Math.round(8 * dp), 0, Math.round(6 * dp));
-            panel.addView(title);
-            panel.addView(goldLine(ui, dp));
-
-            final AchievementsView list = new AchievementsView(ui, instance, true);
+            final AchievementsView list = new AchievementsView(GamePanel.themed(this), instance, true);
             list.reload();
-            panel.addView(list, new android.widget.LinearLayout.LayoutParams(
-                    android.view.ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f));
-            panel.addView(goldLine(ui, dp));
-
-            final android.widget.TextView close = new android.widget.TextView(ui);
-            close.setText(R.string.cheats_close);
-            close.setTextSize(16);
-            close.setTypeface(android.graphics.Typeface.SERIF);
-            close.setTextColor(AchievementsView.GAME_TEXT);
-            close.setShadowLayer(3, 1, 1, android.graphics.Color.BLACK);
-            close.setGravity(android.view.Gravity.CENTER);
-            close.setPadding(0, Math.round(8 * dp), 0, Math.round(8 * dp));
-            panel.addView(close);
-
-            // A dimmed scrim over the game; a tap outside the panel closes it.
-            final android.widget.FrameLayout scrim = new android.widget.FrameLayout(ui);
-            scrim.setBackgroundColor(0xB0000000);
-            final int width = Math.min(Math.round(620 * dp), Math.round(screen.widthPixels * 0.92f));
-            // (Below the status bar: the window is not drawn under it.)
-            final int height = Math.round(screen.heightPixels * 0.78f);
-            final android.widget.FrameLayout.LayoutParams panelParams =
-                    new android.widget.FrameLayout.LayoutParams(width, height, android.view.Gravity.CENTER);
-            scrim.addView(panel, panelParams);
-            panel.setClickable(true); // a tap on the panel isn't a tap outside it
-
-            final android.app.Dialog dialog = new android.app.Dialog(ui, android.R.style.Theme_Translucent_NoTitleBar);
-            dialog.setContentView(scrim);
-            scrim.setOnClickListener(v -> dialog.dismiss());
-            close.setOnClickListener(v -> dialog.dismiss());
-            dialog.setOnDismissListener(d -> {
+            achievementsDialog = GamePanel.create(this, R.string.achievements_title, list, () -> {
                 achievementsDialog = null;
                 nativeAchievementsClosed();
             });
-            achievementsDialog = dialog;
-            dialog.show();
+            achievementsDialog.show();
         });
-    }
-
-    private static android.view.View goldLine(android.content.Context context, float dp) {
-        android.view.View line = new android.view.View(context);
-        line.setBackgroundColor(AchievementsView.GAME_GOLD);
-        line.setLayoutParams(new android.widget.LinearLayout.LayoutParams(
-                android.view.ViewGroup.LayoutParams.MATCH_PARENT, Math.max(1, Math.round(1.5f * dp))));
-        return line;
     }
 
     @SuppressWarnings("unused") // from native code (achievements_android.cpp)
