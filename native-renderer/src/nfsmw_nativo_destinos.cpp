@@ -125,7 +125,7 @@ REXCVAR_DEFINE_BOOL(xdroid360_borrado_d3d, true, "NFSMW",
                     "clears to RB_DEPTH_CLEAR of every depth target at that EDRAM base, whatever its pitch: "
                     "D3D clears the 1280x720 depth as 640 wide with 4x MSAA, the same EDRAM. false = dropped "
                     "as before");
-REXCVAR_DEFINE_INT32(xdroid360_borrado_d3d_vertices, 0, "NFSMW",
+REXCVAR_DEFINE_INT32(xdroid360_borrado_d3d_vertices, 1, "NFSMW",
                      "XDroid360: D3D's Clear rectangles that carry the clear values in their three vertices "
                      "(x, y, z and a float color each, 21 words in vertex fetch 0; State of Decay's D3D leaves "
                      "RB_DEPTH_CLEAR at 0). 0 = off: only RB_DEPTH_CLEAR, as before. 1 = the depth comes from "
@@ -3524,7 +3524,7 @@ class DestinosVulkan final : public DestinosNativos, public ContextoDestinos {
     const int32_t modo_vertices = REXCVAR_GET(xdroid360_borrado_d3d_vertices);
     if (modo_vertices != 0 && memoria_) {
       const uint32_t fetch0 = r[0x4800], fetch1 = r[0x4801];
-      if ((fetch0 & 0x3) == 3 && ((fetch1 >> 2) & 0xFFFFFF) == 21 && (fetch0 & 0x1FFFFFFC) != 0) {
+      if ((fetch0 & 0x3) == 3 && ((fetch1 >> 2) & 0xFFFFFF) >= 21 && (fetch0 & 0x1FFFFFFC) != 0) {
         const uint8_t* vertices = memoria_->TranslatePhysical(fetch0 & 0x1FFFFFFC);
         const uint32_t endian = fetch1 & 0x3;
         const auto flotante = [&](uint32_t palabra) {
