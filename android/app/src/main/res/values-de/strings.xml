@@ -10,4 +10,5 @@
     <string name="achievement_secret_hint">Spiel weiter, um es zu entdecken.</string>
     <string name="achievement_open">Noch nicht freigeschaltet</string>
     <string name="achievement_done">Freigeschaltet am %1$s</string>
+    <string name="achievement_state_locked">Offen</string>
 </resources>
