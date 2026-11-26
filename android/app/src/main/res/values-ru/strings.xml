@@ -286,4 +286,5 @@
     <string name="achievement_secret_hint">Играйте дальше, чтобы узнать.</string>
     <string name="achievement_open">Ещё не получено</string>
     <string name="achievement_done">Получено: %1$s</string>
+    <string name="achievement_state_locked">Не получено</string>
 </resources>

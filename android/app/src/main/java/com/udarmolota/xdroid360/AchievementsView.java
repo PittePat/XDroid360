@@ -55,9 +55,9 @@ final class AchievementsView extends LinearLayout {
 
         LinearLayout header = new LinearLayout(context);
         header.setOrientation(VERTICAL);
-        header.setPadding(dp(16), dp(8), dp(16), dp(12));
+        header.setPadding(dp(16), dp(gameStyle ? 4 : 8), dp(16), dp(gameStyle ? 6 : 12));
         summary = new TextView(context);
-        summary.setTextSize(gameStyle ? 17 : 16);
+        summary.setTextSize(gameStyle ? 14 : 16);
         if (gameStyle) {
             summary.setTypeface(Typeface.SERIF);
             summary.setTextColor(GAME_TEXT);
@@ -68,8 +68,8 @@ final class AchievementsView extends LinearLayout {
         bar.setProgressTintList(ColorStateList.valueOf(gameStyle ? GAME_GOLD_BRIGHT
                 : MaterialColors.getColor(context, androidx.appcompat.R.attr.colorPrimary, GAME_GOLD)));
         bar.setProgressBackgroundTintList(ColorStateList.valueOf(gameStyle ? 0xFF3A3024 : 0x33888888));
-        LayoutParams barParams = new LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(8));
-        barParams.topMargin = dp(8);
+        LayoutParams barParams = new LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(gameStyle ? 6 : 8));
+        barParams.topMargin = dp(gameStyle ? 4 : 8);
         header.addView(bar, barParams);
         addView(header);
 
@@ -121,7 +121,7 @@ final class AchievementsView extends LinearLayout {
             LinearLayout row = new LinearLayout(context);
             row.setOrientation(HORIZONTAL);
             row.setGravity(Gravity.CENTER_VERTICAL);
-            row.setPadding(dp(16), dp(10), dp(16), dp(10));
+            row.setPadding(dp(16), dp(game ? 4 : 10), dp(16), dp(game ? 4 : 10));
 
             ImageView icon = new ImageView(context);
             if (e.icon != null) {
@@ -134,27 +134,34 @@ final class AchievementsView extends LinearLayout {
                 icon.setColorFilter(new ColorMatrixColorFilter(gray));
                 icon.setAlpha(0.45f);
             }
-            row.addView(icon, new LayoutParams(dp(56), dp(56)));
+            int iconSize = dp(game ? 34 : 56);
+            row.addView(icon, new LayoutParams(iconSize, iconSize));
 
             LinearLayout texts = new LinearLayout(context);
             texts.setOrientation(VERTICAL);
-            texts.setPadding(dp(12), 0, dp(8), 0);
+            texts.setPadding(dp(game ? 10 : 12), 0, dp(8), 0);
             TextView name = new TextView(context);
-            name.setTextSize(16);
+            name.setTextSize(game ? 13.5f : 16);
             name.setTypeface(game ? Typeface.create(Typeface.SERIF, Typeface.BOLD) : Typeface.DEFAULT_BOLD);
             name.setText(hide ? context.getString(R.string.achievement_secret) : Achievements.text(e.name, language));
             TextView desc = new TextView(context);
-            desc.setTextSize(13);
+            desc.setTextSize(game ? 11 : 13);
             desc.setText(hide ? context.getString(R.string.achievement_secret_hint)
                     : Achievements.text(done ? e.unlocked : e.locked, language));
             TextView status = new TextView(context);
-            status.setTextSize(12);
-            status.setText(done
-                    ? context.getString(R.string.achievement_done, DateFormat.getMediumDateFormat(context)
-                            .format(new Date(unlocked.get(e.id))))
-                    : context.getString(R.string.achievement_open));
+            status.setTextSize(game ? 10 : 12);
+            if (game) { // short, beside the points: the date it was earned, or Locked
+                status.setText(done ? DateFormat.getMediumDateFormat(context).format(new Date(unlocked.get(e.id)))
+                        : context.getString(R.string.achievement_state_locked));
+                status.setGravity(Gravity.END);
+            } else {
+                status.setText(done
+                        ? context.getString(R.string.achievement_done, DateFormat.getMediumDateFormat(context)
+                                .format(new Date(unlocked.get(e.id))))
+                        : context.getString(R.string.achievement_open));
+            }
             TextView points = new TextView(context);
-            points.setTextSize(game ? 18 : 15);
+            points.setTextSize(15);
             points.setTypeface(game ? Typeface.create(Typeface.SERIF, Typeface.BOLD) : Typeface.DEFAULT_BOLD);
             points.setText(String.valueOf(e.points));
             if (game) {
@@ -171,9 +178,18 @@ final class AchievementsView extends LinearLayout {
             }
             texts.addView(name);
             texts.addView(desc);
-            texts.addView(status);
+            if (!game) texts.addView(status);
             row.addView(texts, new LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
-            row.addView(points);
+            if (game) { // the points with the state under them: two lines of text a row, not three
+                LinearLayout right = new LinearLayout(context);
+                right.setOrientation(VERTICAL);
+                right.setGravity(Gravity.END);
+                right.addView(points);
+                right.addView(status);
+                row.addView(right);
+            } else {
+                row.addView(points);
+            }
             cell.addView(row);
 
             if (game) { // a thin gold line between the rows, as the menus' dividers

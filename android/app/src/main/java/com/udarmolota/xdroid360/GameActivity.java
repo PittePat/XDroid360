@@ -543,12 +543,12 @@ public class GameActivity extends SDLActivity {
 
             final android.widget.TextView title = new android.widget.TextView(ui);
             title.setText(R.string.achievements_title);
-            title.setTextSize(24);
+            title.setTextSize(20);
             title.setTypeface(android.graphics.Typeface.create(android.graphics.Typeface.SERIF, android.graphics.Typeface.BOLD));
             title.setTextColor(AchievementsView.GAME_GOLD_BRIGHT);
             title.setShadowLayer(4, 1, 2, android.graphics.Color.BLACK);
             title.setGravity(android.view.Gravity.CENTER);
-            title.setPadding(0, Math.round(14 * dp), 0, Math.round(10 * dp));
+            title.setPadding(0, Math.round(8 * dp), 0, Math.round(6 * dp));
             panel.addView(title);
             panel.addView(goldLine(ui, dp));
 
@@ -560,19 +560,20 @@ public class GameActivity extends SDLActivity {
 
             final android.widget.TextView close = new android.widget.TextView(ui);
             close.setText(R.string.cheats_close);
-            close.setTextSize(18);
+            close.setTextSize(16);
             close.setTypeface(android.graphics.Typeface.SERIF);
             close.setTextColor(AchievementsView.GAME_TEXT);
             close.setShadowLayer(3, 1, 1, android.graphics.Color.BLACK);
             close.setGravity(android.view.Gravity.CENTER);
-            close.setPadding(0, Math.round(12 * dp), 0, Math.round(12 * dp));
+            close.setPadding(0, Math.round(8 * dp), 0, Math.round(8 * dp));
             panel.addView(close);
 
             // A dimmed scrim over the game; a tap outside the panel closes it.
             final android.widget.FrameLayout scrim = new android.widget.FrameLayout(ui);
             scrim.setBackgroundColor(0xB0000000);
             final int width = Math.min(Math.round(620 * dp), Math.round(screen.widthPixels * 0.92f));
-            final int height = Math.round(screen.heightPixels * 0.9f);
+            // (Below the status bar: the window is not drawn under it.)
+            final int height = Math.round(screen.heightPixels * 0.78f);
             final android.widget.FrameLayout.LayoutParams panelParams =
                     new android.widget.FrameLayout.LayoutParams(width, height, android.view.Gravity.CENTER);
             scrim.addView(panel, panelParams);
