@@ -491,6 +491,7 @@ public class LauncherActivity extends AppCompatActivity {
         h.banner.setImageBitmap(null);
         h.settings.setVisibility(View.GONE);
         h.play.setVisibility(View.GONE);
+        h.achievements.setVisibility(View.GONE);
         h.updateBadge.setVisibility(View.GONE);
         View.OnClickListener open = v -> startActivity(new Intent(this, BuildActivity.class)
                 .putExtra(BuildActivity.EXTRA_JOB, job.id));
@@ -503,6 +504,11 @@ public class LauncherActivity extends AppCompatActivity {
         h.settings.setVisibility(View.VISIBLE);
         h.play.setVisibility(View.VISIBLE);
         h.itemView.setOnClickListener(null);
+        // Dragon Age: Origins: the achievements list, under Play and Settings.
+        boolean hasAchievements = Achievements.supported(i);
+        h.achievements.setVisibility(hasAchievements ? View.VISIBLE : View.GONE);
+        h.achievements.setOnClickListener(hasAchievements ? v -> startActivity(
+                new Intent(this, AchievementsActivity.class).putExtra(InstanceActivity.EXTRA_ID, i.id)) : null);
         h.name.setText(i.name);
         h.details.setText(i.buildLabel());
         Recipe newer = i.newerProfile(this);
@@ -820,7 +826,7 @@ public class LauncherActivity extends AppCompatActivity {
     static final class Holder extends RecyclerView.ViewHolder {
         final TextView name, details, updateBadge;
         final ImageView banner;
-        final View play, settings, more;
+        final View play, settings, more, achievements;
 
         Holder(View v) {
             super(v);
@@ -831,6 +837,7 @@ public class LauncherActivity extends AppCompatActivity {
             play = v.findViewById(R.id.play);
             settings = v.findViewById(R.id.settings);
             more = v.findViewById(R.id.more);
+            achievements = v.findViewById(R.id.achievements);
         }
     }
 }

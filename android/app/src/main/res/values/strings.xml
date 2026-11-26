@@ -312,7 +312,6 @@
 
     <!-- Achievements (Dragon Age: Origins): the game's own list, points and texts -->
     <string name="achievements_title">Achievements</string>
-    <string name="achievements_open">Show achievements</string>
     <string name="achievements_summary">%1$d of %2$d unlocked · %3$d of %4$d points</string>
     <string name="achievements_unreadable">The achievements could not be read from the game: %1$s</string>
     <string name="achievement_unlocked">Achievement unlocked</string>
