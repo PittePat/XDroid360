@@ -2652,11 +2652,13 @@ class SistemaGraficoNativo final : public rex::system::IGraphicsSystem {
         const uint32_t base = g::XE_GPU_REG_SHADER_CONSTANT_FETCH_00_0 + uint32_t(s.registro) * 6;
         const uint32_t d0 = Registro(base);
         const uint32_t d1 = Registro(base + 1);
+        const uint32_t d2 = Registro(base + 2);
         const uint32_t d3 = Registro(base + 3);
         const uint32_t d5 = Registro(base + 5);
-        texturas += fmt::format(" t{}={:08X}/f{}/d{}/s{:03X}/e{}{}", s.registro, d1 & 0xFFFFF000,
+        texturas += fmt::format(" t{}={:08X}/f{}/d{}/s{:03X}/e{}{}/{}x{}/p{}/c{}{}", s.registro, d1 & 0xFFFFF000,
                                 d1 & 0x3F, (d5 >> 9) & 0x3, (d3 >> 1) & 0xFFF, (d1 >> 6) & 0x3,
-                                (d0 & 0x3) == 2 ? "" : "!");
+                                (d0 & 0x3) == 2 ? "" : "!", (d2 & 0x1FFF) + 1, ((d2 >> 13) & 0x1FFF) + 1,
+                                (d0 >> 22) & 0x1FF, (d0 >> 10) & 0x7, (d0 >> 13) & 0x7);
       }
     }
     if (!vs_dibujo_ || !ps_dibujo_) {
@@ -2688,6 +2690,17 @@ class SistemaGraficoNativo final : public rex::system::IGraphicsSystem {
                 Registro(g::XE_GPU_REG_RB_COLORCONTROL), Registro(g::XE_GPU_REG_RB_DEPTHCONTROL),
                 Registro(g::XE_GPU_REG_RB_STENCILREFMASK), Registro(g::XE_GPU_REG_RB_MODECONTROL),
                 texturas);
+    // XDroid360 diagnostic: framing registers (window offset, scissors, viewport Y).
+    {
+      float yscale, yoffset;
+      const uint32_t ys = Registro(g::XE_GPU_REG_PA_CL_VPORT_YSCALE), yo = Registro(g::XE_GPU_REG_PA_CL_VPORT_YOFFSET);
+      std::memcpy(&yscale, &ys, 4);
+      std::memcpy(&yoffset, &yo, 4);
+      REXLOG_INFO("[traza]   marco: win_off {:08X} win_sc {:08X}-{:08X} scr_sc {:08X}-{:08X} vte {:08X} yscale {} yoffset {}",
+                  Registro(g::XE_GPU_REG_PA_SC_WINDOW_OFFSET), Registro(g::XE_GPU_REG_PA_SC_WINDOW_SCISSOR_TL),
+                  Registro(g::XE_GPU_REG_PA_SC_WINDOW_SCISSOR_BR), Registro(g::XE_GPU_REG_PA_SC_SCREEN_SCISSOR_TL),
+                  Registro(g::XE_GPU_REG_PA_SC_SCREEN_SCISSOR_BR), Registro(g::XE_GPU_REG_PA_CL_VTE_CNTL), yscale, yoffset);
+    }
     TrazarVertices(iniciador);
   }
 
@@ -2863,6 +2876,23 @@ class SistemaGraficoNativo final : public rex::system::IGraphicsSystem {
                 r.rb_copy_control, r.rb_copy_dest_base, r.rb_copy_dest_info, r.rb_copy_dest_pitch,
                 r.rb_surface_info, r.rb_color_info[0], r.rb_depth_info, r.rb_color_clear,
                 r.rb_color_clear_lo, r.rb_depth_clear);
+    {
+      // XDroid360 diagnostic: the copy's window offset, scissor and its three vertices (x, y).
+      std::string vertices;
+      const uint32_t dir = r.fetch_vertices[0] >> 2;
+      if ((r.fetch_vertices[0] & 0x3) == 3 && dir && memory_) {
+        const uint8_t* v = memory_->TranslatePhysical(dir * 4);
+        const auto orden = static_cast<rex::graphics::xenos::Endian>(r.fetch_vertices[1] & 0x3);
+        for (int i = 0; i < 6; ++i) {
+          float f;
+          std::memcpy(&f, v + i * 4, 4);
+          vertices += fmt::format(" {}", rex::graphics::xenos::GpuSwap(f, orden));
+        }
+      }
+      REXLOG_INFO("[traza]   copia marco: win_off {:08X} win_sc {:08X}-{:08X} su_sc {:08X} vtx {:08X} vertices:{}",
+                  r.pa_sc_window_offset, r.pa_sc_window_scissor_tl, r.pa_sc_window_scissor_br,
+                  r.pa_su_sc_mode_cntl, r.pa_su_vtx_cntl, vertices);
+    }
   }
 
   // Step C5a: the last VS (type 0) or PS (type 1) uploaded to the ring.
