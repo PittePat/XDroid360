@@ -79,6 +79,7 @@ public class InstanceActivity extends AppCompatActivity {
         driverPick.setOnClickListener(v -> pickDriver.launch(new String[] { "*/*" }));
         bindSpinner(findViewById(R.id.sysmem), R.array.sysmem, indexOf(SYSMEM, instance.sysmem), i -> instance.sysmem = SYSMEM[i]);
         bindOptions();
+        bindResolutionScale();
         bindWidescreen();
         bindTextureLod();
         View advanced = findViewById(R.id.advanced);
@@ -119,6 +120,28 @@ public class InstanceActivity extends AppCompatActivity {
     }
 
     private com.google.android.material.textfield.TextInputEditText env;
+
+    /**
+     * Resolution scale (Dragon Age: Origins only; hidden for the other games): Xenia's draw
+     * resolution scale, 1x to 3x of the size the game draws at. It multiplies the widescreen picture
+     * as well. The list is off with the native renderer, which draws at the game's own size.
+     */
+    private void bindResolutionScale() {
+        int visibility = instance.hasResolutionScale() ? View.VISIBLE : View.GONE;
+        findViewById(R.id.resolution_scale_label).setVisibility(visibility);
+        findViewById(R.id.resolution_scale).setVisibility(visibility);
+        findViewById(R.id.resolution_scale_hint).setVisibility(visibility);
+        if (!instance.hasResolutionScale()) return;
+        Spinner spinner = findViewById(R.id.resolution_scale);
+        java.util.List<CharSequence> labels = new java.util.ArrayList<>();
+        for (int scale = 1; scale <= 3; scale++) {
+            labels.add(getString(R.string.resolution_scale_value, scale, 1280 * scale, 720 * scale));
+        }
+        ArrayAdapter<CharSequence> adapter = new ArrayAdapter<>(this, android.R.layout.simple_spinner_item, labels);
+        adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+        listen(spinner, adapter, instance.resolutionScaleToUse() - 1, i -> instance.resolutionScale = i + 1);
+        spinner.setEnabled(instance.resolutionScaleApplies());
+    }
 
     /** Widescreen On/Off (Dragon Age: Origins only; hidden for the other games). */
     private void bindWidescreen() {
@@ -270,6 +293,7 @@ public class InstanceActivity extends AppCompatActivity {
                 instance.renderer = checked == R.id.renderer_native ? Instance.RENDERER_NATIVE : Instance.RENDERER_XENIA;
                 save();
                 bindTextureLod(); // its default depends on the renderer
+                bindResolutionScale(); // only the Xenia renderer has it
             });
         }
         org.json.JSONObject frameRate = instance.option("frame_rate");

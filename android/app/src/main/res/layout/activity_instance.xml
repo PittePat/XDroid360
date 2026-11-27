@@ -281,6 +281,30 @@
                         android:layout_height="wrap_content"
                         android:visibility="gone" />
 
+                    <!-- Dragon Age: Origins only (shown by InstanceActivity.bindResolutionScale). -->
+                    <TextView
+                        android:id="@+id/resolution_scale_label"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="8dp"
+                        android:text="@string/setting_resolution_scale"
+                        android:textAppearance="?attr/textAppearanceTitleSmall"
+                        android:visibility="gone" />
+
+                    <Spinner
+                        android:id="@+id/resolution_scale"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:visibility="gone" />
+
+                    <TextView
+                        android:id="@+id/resolution_scale_hint"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:text="@string/resolution_scale_hint"
+                        android:textAppearance="?attr/textAppearanceBodySmall"
+                        android:visibility="gone" />
+
                     <!-- Dragon Age: Origins only (shown by InstanceActivity.bindWidescreen). -->
                     <TextView
                         android:id="@+id/widescreen_label"

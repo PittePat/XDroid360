@@ -715,6 +715,13 @@ public class GameActivity extends SDLActivity {
             if (current.hasNativeRenderer()) {
                 XeniaConfig.set(config, "dao_gpu_renderer", "\"" + current.rendererToUse() + "\"");
             }
+            // Dragon Age's resolution scale: Xenia's draw resolution scale on both axes. Read by the
+            // Xenia renderer; the native one draws at the game's own size and ignores it. Written
+            // either way, so a switch back to 1x isn't kept by an earlier start.
+            if (current.hasResolutionScale()) {
+                XeniaConfig.set(config, "draw_resolution_scale_x", String.valueOf(current.resolutionScaleToUse()));
+                XeniaConfig.set(config, "draw_resolution_scale_y", String.valueOf(current.resolutionScaleToUse()));
+            }
             // Mass Effect takes a missing intro movie for a failed disc read and quits at once
             // (XamShowDirtyDiscErrorUI), so the runtime's skip_intro_logos patch, on by default on
             // Android, must stay off for it.
@@ -738,6 +745,7 @@ public class GameActivity extends SDLActivity {
         Log.i(TAG, "Instance " + current.id + ": driver " + current.driver + ", sysmem " + current.sysmem
                 + ", texture LOD " + current.textureLodToUse() + ", display " + current.hudMode
                 + (current.hasWidescreen() ? ", widescreen " + (current.widescreen ? "on" : "off") : "")
+                + (current.hasResolutionScale() ? ", resolution scale " + current.resolutionScaleToUse() + "x" : "")
                 + ", language " + current.languageToUse()
                 + (current.option("frame_rate") != null ? ", frame rate " + current.frameRateToUse() : "")
                 + (current.option("preset") != null ? ", preset " + (current.preset.isEmpty() ? "game's own" : current.preset) : ""));

@@ -45,6 +45,12 @@ final class Instance {
      * (DAO_FILL_SCREEN, see GameActivity.applyInstanceSettings) instead of 16:9 with black bars.
      */
     boolean widescreen = false;
+    /**
+     * Resolution scale, 1 to 3 (Dragon Age: Origins): Xenia's draw_resolution_scale_x/y, the multiple
+     * of the size the game draws at. Only the Xenia renderer has it; the native one draws at the
+     * game's own size.
+     */
+    int resolutionScale = 1;
 
     /** Whether the game has achievements the launcher shows (Dragon Age: Origins). */
     boolean hasAchievements() {
@@ -54,6 +60,20 @@ final class Instance {
     /** Whether the Widescreen setting exists for this game. */
     boolean hasWidescreen() {
         return DAO_TITLE_ID.equals(titleId());
+    }
+
+    /** Whether the Resolution scale setting exists for this game: the one with Widescreen. */
+    boolean hasResolutionScale() {
+        return hasWidescreen();
+    }
+
+    /** Whether the scale does anything now: only the Xenia renderer scales. */
+    boolean resolutionScaleApplies() {
+        return RENDERER_XENIA.equals(rendererToUse());
+    }
+
+    int resolutionScaleToUse() {
+        return Math.max(1, Math.min(3, resolutionScale));
     }
 
     /**
@@ -305,6 +325,7 @@ final class Instance {
             s.put("texture_lod_bias", textureLodToUse());         // what an older launcher reads
             s.put("hud_mode", hudMode);
             s.put("widescreen", widescreen);
+            s.put("resolution_scale", resolutionScale);
             s.put("language", language);
             s.put("diagnostics", diagnostics);
             s.put("vibrate_on_touch", vibrateOnTouch);
@@ -352,6 +373,7 @@ final class Instance {
                 // Before hud_mode: the performance bar was a switch, on unless turned off.
                 language = s.optString("language", language);
                 widescreen = s.optBoolean("widescreen", widescreen);
+                resolutionScale = s.optInt("resolution_scale", resolutionScale);
                 diagnostics = s.optBoolean("diagnostics", diagnostics);
                 hudMode = s.has("hud_mode") ? s.optInt("hud_mode", hudMode)
                         : s.optBoolean("perf_overlay", true) ? HUD_FULL : HUD_OFF;

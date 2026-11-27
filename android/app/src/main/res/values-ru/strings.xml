@@ -47,6 +47,9 @@
     <string name="language_auto">Язык телефона</string>
     <string name="setting_diagnostics">Диагностика для отчёта об ошибке</string>
     <string name="setting_diagnostics_help">Пишет замеры GPU в лог игры (немного медленнее). Включите, поиграйте там, где плохо, и отправьте отчёт об ошибке.</string>
+    <string name="setting_resolution_scale">Масштаб разрешения</string>
+    <string name="resolution_scale_value">%1$d× (%2$d × %3$d)</string>
+    <string name="resolution_scale_hint">Умножает размер, в котором игра рисует кадр, в том числе в режиме широкого экрана. Есть только у рендерера Xenia (Рендерер, выше); нативный рендерер рисует в собственном размере игры. На GPU без sparse binding масштаб снижается до 1×. 2× — это вчетверо больше пикселей, скорость заметно падает. Применяется при следующем запуске игры.</string>
     <string name="setting_widescreen">Широкий экран</string>
     <string name="widescreen_on">Вкл</string>
     <string name="widescreen_off">Выкл</string>

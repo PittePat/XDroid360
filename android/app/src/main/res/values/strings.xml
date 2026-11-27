@@ -49,6 +49,9 @@
     <string name="language_auto">The phone\'s language</string>
     <string name="setting_diagnostics">Diagnostics for bug reports</string>
     <string name="setting_diagnostics_help">Writes the GPU\'s measurements into the game\'s log (a little slower). Turn it on, play the part that misbehaves, then Report a bug.</string>
+    <string name="setting_resolution_scale">Resolution scale</string>
+    <string name="resolution_scale_value">%1$d× (%2$d × %3$d)</string>
+    <string name="resolution_scale_hint">Multiplies the size the game draws at, the widescreen picture too. Only the Xenia renderer has it (Renderer, above); the native renderer draws at the game\'s own size. A GPU without sparse binding falls back to 1×. 2× is four times the pixels and costs a lot of speed. Applies the next time the game starts.</string>
     <string name="setting_widescreen">Widescreen</string>
     <string name="widescreen_on">On</string>
     <string name="widescreen_off">Off</string>
