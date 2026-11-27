@@ -2731,6 +2731,27 @@ class SistemaGraficoNativo final : public rex::system::IGraphicsSystem {
       return;
     }
     ++trazas_;
+    {
+      // XDroid360 diagnostic: the non-zero float constants of the VS (c0-c63) and the PS (c0-c63) of this draw.
+      std::string constantes;
+      for (uint32_t k = 0; k < 64; ++k) {
+        for (uint32_t grupo = 0; grupo < 2; ++grupo) {
+          const uint32_t base_c = 0x4000u + (grupo * 256 + k) * 4;
+          float v[4];
+          bool alguno = false;
+          for (uint32_t j = 0; j < 4; ++j) {
+            const uint32_t crudo = Registro(base_c + j);
+            std::memcpy(&v[j], &crudo, 4);
+            alguno = alguno || crudo != 0;
+          }
+          if (alguno) {
+            constantes += fmt::format(" {}c{}=({:.5g},{:.5g},{:.5g},{:.5g})", grupo ? "PS" : "VS", k, v[0], v[1],
+                                      v[2], v[3]);
+          }
+        }
+      }
+      REXLOG_INFO("[traza]   constantes:{}", constantes);
+    }
     std::string detalle;
     uint32_t ranura = UINT32_MAX;
     uint32_t zancada = 0;
